@@ -1,7 +1,12 @@
 import { LiveAnchorStageEngine } from "@/lib/realtime/liveAnchorStageEngine";
 import { WebGLVisemeCompositor } from "@/lib/realtime/webglVisemeCompositor";
 import { VisemeCodebookService } from "@/lib/realtime/visemeCodebook";
-import { PlatePreset } from "@/components/realtime/viseme-compositor/VisemeCompositorStudio";
+export interface PlatePreset {
+  id: string;
+  name: string;
+  url: string;
+  [key: string]: unknown;
+}
 
 declare global {
   interface Window {
