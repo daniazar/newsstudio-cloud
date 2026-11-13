@@ -5,7 +5,6 @@
  */
 
 import { NextResponse } from "next/server";
-import { exec, spawn, execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
@@ -14,9 +13,11 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api:presenter:sadtalker:server");
 
-const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 const SADTALKER_PORT = 8000;
+
+function allowLocalServerControl(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.ALLOW_API_SPAWN === "true";
+}
 
 function getSadTalkerPath(): string {
   return path.join(process.cwd(), "vendor", "SadTalker-Server");
@@ -27,7 +28,16 @@ function getSadTalkerPath(): string {
  * Checks if SadTalker is running on port 8000.
  */
 export const GET = withTenantAuth(async () => {
+  if (!allowLocalServerControl()) {
+    return NextResponse.json({
+      online: false,
+      disabled: true,
+      message: "Local SadTalker process control is disabled in cloud/remote-worker mode.",
+    });
+  }
   try {
+    const { exec } = await import("child_process");
+    const execAsync = promisify(exec);
     const { stdout } = await execAsync(`lsof -t -i:${SADTALKER_PORT} -sTCP:LISTEN`);
     const pid = stdout.trim();
     return NextResponse.json({ online: !!pid, pid });
@@ -41,6 +51,18 @@ export const GET = withTenantAuth(async () => {
  * Starts SadTalker in the background.
  */
 export const POST = withWorkerOrSuperAdmin(async () => {
+  if (!allowLocalServerControl()) {
+    return NextResponse.json(
+      {
+        success: false,
+        disabled: true,
+        error: "Local process spawning is disabled in cloud/remote-worker mode.",
+      },
+      { status: 503 }
+    );
+  }
+  const { exec, spawn } = await import("child_process");
+  const execAsync = promisify(exec);
   // 1. Check if already running
   try {
     const { stdout } = await execAsync(`lsof -t -i:${SADTALKER_PORT} -sTCP:LISTEN`);
@@ -88,7 +110,17 @@ export const POST = withWorkerOrSuperAdmin(async () => {
  * Stops SadTalker by killing processes on port 8000.
  */
 export const DELETE = withWorkerOrSuperAdmin(async () => {
+  if (!allowLocalServerControl()) {
+    return NextResponse.json({
+      success: true,
+      disabled: true,
+      message: "Local SadTalker process control is disabled in cloud/remote-worker mode.",
+    });
+  }
   try {
+    const { exec, execFile } = await import("child_process");
+    const execAsync = promisify(exec);
+    const execFileAsync = promisify(execFile);
     const { stdout } = await execAsync(`lsof -t -i:${SADTALKER_PORT} -sTCP:LISTEN`);
     const pids = stdout.trim().split("\n").map((p) => p.trim()).filter((p) => /^\d+$/.test(p));
     

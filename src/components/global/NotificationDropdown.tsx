@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useToast } from "./ToastContainer";
-import { usePolling } from "@/lib/hooks/usePolling";
 
 const fetcher = async (url: string) => {
   try {
@@ -40,17 +39,22 @@ export const NotificationDropdown = React.memo(function NotificationDropdown({
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { enabled: pollingEnabled, interval: pollingInterval } = usePolling();
 
-  // Use SWR to fetch notifications, refreshing dynamically
+  // Fetch notifications on mount, focus, or when dropdown opens (zero idle polling)
   const { data: notifications, mutate } = useSWR<{ data?: NotificationItem[]; notifications?: NotificationItem[] } | NotificationItem[]>(
     "/api/notifications",
     fetcher,
     {
-      refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
-      revalidateOnFocus: false,
+      refreshInterval: 0,
+      revalidateOnFocus: true,
     }
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      void mutate();
+    }
+  }, [isOpen, mutate]);
 
   const notificationsList = useMemo<NotificationItem[]>(
     () => Array.isArray(notifications) ? notifications : (notifications?.data ?? notifications?.notifications ?? []),

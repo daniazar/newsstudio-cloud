@@ -16,7 +16,7 @@ const log = createLogger("realtime:musetalkAssetService");
 import type {
   MuseTalkAvatarGeometry,
   MuseTalkAvatarMeta,
-} from "../../../vendor/viseme-compositor-core/packages/core/src/types";
+} from "./types";
 export type { MuseTalkAvatarGeometry, MuseTalkAvatarMeta };
 
 const PUBLIC_LATENTS_DIR = path.join(process.cwd(), "public", "assets", "avatars", "latents");

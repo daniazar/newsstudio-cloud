@@ -11,7 +11,6 @@ import { NextRequest, NextResponse } from "next/server";
 import http from "http";
 import path from "path";
 import os from "os";
-import { spawn } from "child_process";
 import { requireTenant } from "@/lib/tenant";
 import { DEFAULT_FLOW_PROJECT_URL } from "@/components/editor/shared/visuals/types";
 import { getChromePath } from "@/lib/binaries";
@@ -161,9 +160,17 @@ async function restoreAndMaximizeViaCdp(targetId: string, pageWsUrl?: string, po
 }
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  const isRemote =
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true");
+
+  if (isRemote) {
     return NextResponse.json(
-      { error: "Browser automation is not available in cloud deployments" },
+      {
+        success: false,
+        error: "Browser automation is handled by the local PC worker and is disabled in cloud/remote mode.",
+      },
       { status: 503 }
     );
   }
@@ -282,6 +289,7 @@ export async function POST(req: NextRequest) {
       targetUrl,
     ];
 
+    const { spawn } = await import("child_process");
     const child = spawn(chromePath, chromeArgs, { detached: true, stdio: "ignore" });
     child.unref();
 

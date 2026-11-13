@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 import type { StudioPayload } from "@/lib/studio/parsers/types";
 
 const BodySchema = z.object({
@@ -130,6 +131,7 @@ export async function POST(request: NextRequest) {
       message: `Studio job queued: ${body.studioType} | outputMode: ${body.outputMode} | turns: ~${turnCount}`,
     },
   });
+  void broadcastWorkerWake("job_queued");
 
   return NextResponse.json({
     success: true,

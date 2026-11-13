@@ -24,6 +24,7 @@ import {
   type Turntable3DJobConfig,
 } from "@/lib/ecommerce/turntable3dAssets";
 import { TURNTABLE_3D_DEFAULTS } from "@/lib/types/turntable3d";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
 
 export async function POST(request: NextRequest) {
   const t = await requireTenant();
@@ -121,10 +122,15 @@ export async function POST(request: NextRequest) {
       return { asset: linked, job: createdJob };
     });
 
-    // Prefer the live router estimate (accounts for fallbacks); never block > ~1.5s.
-    const engines = await getObject3DEngines({ timeoutMs: 1500 });
+    // Prefer the live router estimate (accounts for fallbacks); never block > ~1.5s in local mode.
+    const isRemote =
+      process.env.NODE_ENV === "production" ||
+      process.env.FORCE_REMOTE_WORKER === "true";
+    const engines = isRemote ? { online: false, quality_routing: {} as Record<string, { estimated_seconds?: number }> } : await getObject3DEngines({ timeoutMs: 1500 });
     const route = engines.online ? engines.quality_routing[quality] : undefined;
     const estimatedSeconds = estimateTurntableSeconds(quality, route?.estimated_seconds);
+
+    void broadcastWorkerWake("job_queued");
 
     return Response.json({ jobId: job.id, asset3DId: asset.id, estimatedSeconds }, { status: 202 });
   } catch (error) {

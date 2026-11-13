@@ -52,7 +52,7 @@ export const isPublicRoute = createPathMatcher([
   "/tools/viseme-compositor(.*)",
   "/wardrobe-studio(.*)",
   "/api/wardrobe(.*)",
-  "/api/health",
+  "/api/health(.*)",
   "/api/inngest(.*)",
   "/api/webhooks(.*)",
   "/api/piper/inspect",
@@ -116,9 +116,9 @@ export { handler as proxy };
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
+    // Skip Next.js internals, static files, and zero-auth health check probes
+    "/((?!_next|api/health|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for other API routes
+    "/(api(?!/health)|trpc)(.*)",
   ],
 };

@@ -10,7 +10,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { promisify } from "util";
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import { storage, generateKey } from "@/lib/storage";
 import { reportProgress, updateSegment } from "../api";
 import { getPersonaById } from "@/lib/tts/personas";
@@ -27,7 +27,6 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("worker:tasks:videoTask");
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 // In-memory cache for resolved action loop paths across persona segments

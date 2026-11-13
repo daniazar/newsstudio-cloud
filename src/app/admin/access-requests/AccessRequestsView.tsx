@@ -39,7 +39,7 @@ export function AccessRequestsView() {
   const { data, error, isValidating, mutate } = useSWR<RequestsResponse>(
     "/api/admin/access-requests",
     fetcher,
-    { refreshInterval: 30_000 },
+    { refreshInterval: 0, revalidateOnFocus: true },
   );
   const { toast } = useToast();
   const [busy, setBusy] = useState<Set<string>>(new Set());

@@ -208,7 +208,6 @@ export const EcommercePreProductionModal: React.FC<EcommercePreProductionModalPr
       });
 
       const data = await res.json();
-      clearInterval(interval);
 
       if (!data.success || !data.script) {
         throw new Error(data.error || "Failed to synthesize storyboard");
@@ -229,11 +228,12 @@ export const EcommercePreProductionModal: React.FC<EcommercePreProductionModalPr
         toast("✨ Storyboard Synthesized", "Gemini 2.5 Flash completed pre-production plan!", "success");
       }, 400);
     } catch (err: unknown) {
-      clearInterval(interval);
       console.error("[PreProductionModal] Synthesis failed:", err);
       const errMsg = err instanceof Error ? err.message : "Could not generate storyboard";
       toast("Synthesis Failed", errMsg, "error");
       setStage("brief");
+    } finally {
+      clearInterval(interval);
     }
   };
 

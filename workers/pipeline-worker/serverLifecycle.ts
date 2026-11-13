@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import { getPythonPath } from "@/lib/binaries";
 import { createLogger } from "@/lib/logger";
+import { resolveVendorRoot } from "./config";
 
 const log = createLogger("worker:serverLifecycle");
 
@@ -40,7 +41,7 @@ export async function startModernTtsServer(): Promise<void> {
   } catch {}
 
   log.info(`  🚀 Starting Modern TTS Server (Port ${PORT}, RTX 5090 BF16)...`);
-  const modernTtsDir = path.join(process.cwd(), "vendor/Modern-TTS-Server");
+  const modernTtsDir = path.join(resolveVendorRoot(), "Modern-TTS-Server");
   const isWinOS = process.platform === "win32";
   const pyBin = isWinOS
     ? path.join(modernTtsDir, "venv/Scripts/python.exe")
@@ -108,7 +109,7 @@ export async function startModernTalkingHeadServer(): Promise<void> {
   }
 
   log.info(`  🚀 Starting Modern TalkingHead Server (Port ${PORT}, MuseTalk / Ditto)...`);
-  const talkingHeadDir = path.join(process.cwd(), "vendor/Modern-TalkingHead-Server");
+  const talkingHeadDir = path.join(resolveVendorRoot(), "Modern-TalkingHead-Server");
   const isWinOS = process.platform === "win32";
   const pyBin = isWinOS
     ? path.join(talkingHeadDir, "venv/Scripts/python.exe")
@@ -193,16 +194,17 @@ export async function startComfyUIServer(): Promise<void> {
 
   log.info(`  🚀 Starting ComfyUI Server...`);
   const env = { ...process.env };
+  const comfyDir = path.join(resolveVendorRoot(), "ComfyUI");
 
-  const comfyPythonCmd = fs.existsSync(path.join(process.cwd(), "vendor/ComfyUI/venv/bin/python"))
-    ? path.join(process.cwd(), "vendor/ComfyUI/venv/bin/python")
-    : isWindows && fs.existsSync(path.join(process.cwd(), "vendor/ComfyUI/venv/Scripts/python.exe"))
-    ? path.join(process.cwd(), "vendor/ComfyUI/venv/Scripts/python.exe")
+  const comfyPythonCmd = fs.existsSync(path.join(comfyDir, "venv/bin/python"))
+    ? path.join(comfyDir, "venv/bin/python")
+    : isWindows && fs.existsSync(path.join(comfyDir, "venv/Scripts/python.exe"))
+    ? path.join(comfyDir, "venv/Scripts/python.exe")
     : getPythonPath();
 
   env.PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True";
   comfyuiProcess = spawn(comfyPythonCmd, ["main.py", "--reserve-vram", "2.5", "--vram-headroom", "1.0", "--disable-pinned-memory", "--port", String(COMFYUI_PORT)], {
-    cwd: path.join(process.cwd(), "vendor/ComfyUI"),
+    cwd: comfyDir,
     stdio: "inherit",
     env,
   });

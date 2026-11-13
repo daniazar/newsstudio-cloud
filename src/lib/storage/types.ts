@@ -60,6 +60,21 @@ export interface StorageClient {
    * @param expiresInSeconds Duration in seconds before URL expires (default 3600)
    */
   getSignedUrl?(key: string, expiresInSeconds?: number): Promise<string>;
+
+  /**
+   * Generate a presigned URL for direct client upload (PutObjectCommand)
+   * @param key The destination path or key inside the storage system
+   * @param contentType The MIME type of the file to be uploaded
+   * @param expiresInSeconds Duration in seconds before URL expires (default 3600)
+   */
+  getPresignedUploadUrl(key: string, contentType: string, expiresInSeconds?: number): Promise<string>;
+
+  /**
+   * Generate a presigned URL for direct client download/read (GetObjectCommand)
+   * @param key The path or key of the file
+   * @param expiresInSeconds Duration in seconds before URL expires (default 3600)
+   */
+  getPresignedReadUrl(key: string, expiresInSeconds?: number): Promise<string>;
 }
 
 export interface StorageItem {

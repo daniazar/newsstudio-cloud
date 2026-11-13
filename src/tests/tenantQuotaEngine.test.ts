@@ -1,4 +1,107 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const { mockCompanies, mockReservations, mockUsageLogs } = vi.hoisted(() => ({
+  mockCompanies: new Map<string, { id: string; name: string; tier: string }>(),
+  mockReservations: new Map<
+    string,
+    { id: string; companyId: string; type: string; amount: number; status: string; metadata: string | null; expiresAt: Date }
+  >(),
+  mockUsageLogs: [] as Array<{ id: string; companyId: string; type: string; amount: number; createdAt: Date }>,
+}));
+
+vi.mock("@/lib/prisma", () => {
+  let idSeq = 1;
+  return {
+    prisma: {
+      company: {
+        upsert: vi.fn(async ({ where, create, update }) => {
+          const existing = mockCompanies.get(where.id);
+          if (existing) {
+            const updated = { ...existing, ...update };
+            mockCompanies.set(where.id, updated);
+            return updated;
+          }
+          const created = { ...create };
+          mockCompanies.set(created.id, created);
+          return created;
+        }),
+        findUnique: vi.fn(async ({ where }) => mockCompanies.get(where.id) ?? null),
+      },
+      tenantReservation: {
+        deleteMany: vi.fn(async ({ where }) => {
+          let count = 0;
+          for (const [k, v] of mockReservations.entries()) {
+            if (!where?.companyId || v.companyId === where.companyId) {
+              mockReservations.delete(k);
+              count++;
+            }
+          }
+          return { count };
+        }),
+        aggregate: vi.fn(async ({ where }) => {
+          let sum = 0;
+          for (const v of mockReservations.values()) {
+            if (
+              v.companyId === where.companyId &&
+              v.type === where.type &&
+              v.status === where.status &&
+              (!where.expiresAt?.gt || v.expiresAt > where.expiresAt.gt)
+            ) {
+              sum += v.amount;
+            }
+          }
+          return { _sum: { amount: sum || null } };
+        }),
+        create: vi.fn(async ({ data }) => {
+          const id = `res_${idSeq++}`;
+          const rec = { id, ...data };
+          mockReservations.set(id, rec);
+          return rec;
+        }),
+        findUnique: vi.fn(async ({ where }) => mockReservations.get(where.id) ?? null),
+        update: vi.fn(async ({ where, data }) => {
+          const rec = mockReservations.get(where.id);
+          if (!rec) throw new Error("Not found");
+          const updated = { ...rec, ...data };
+          mockReservations.set(where.id, updated);
+          return updated;
+        }),
+      },
+      usageLog: {
+        deleteMany: vi.fn(async ({ where }) => {
+          let count = 0;
+          for (let i = mockUsageLogs.length - 1; i >= 0; i--) {
+            if (!where?.companyId || mockUsageLogs[i].companyId === where.companyId) {
+              mockUsageLogs.splice(i, 1);
+              count++;
+            }
+          }
+          return { count };
+        }),
+        aggregate: vi.fn(async ({ where }) => {
+          let sum = 0;
+          for (const u of mockUsageLogs) {
+            if (
+              u.companyId === where.companyId &&
+              u.type === where.type &&
+              (!where.createdAt?.gte || u.createdAt >= where.createdAt.gte)
+            ) {
+              sum += u.amount;
+            }
+          }
+          return { _sum: { amount: sum || null } };
+        }),
+        create: vi.fn(async ({ data }) => {
+          const rec = { id: `usage_${idSeq++}`, createdAt: new Date(), ...data };
+          mockUsageLogs.push(rec);
+          return rec;
+        }),
+      },
+      $transaction: vi.fn(async (ops: Array<Promise<unknown>>) => Promise.all(ops)),
+    },
+  };
+});
+
 import { prisma } from "@/lib/prisma";
 import {
   getTierLimits,

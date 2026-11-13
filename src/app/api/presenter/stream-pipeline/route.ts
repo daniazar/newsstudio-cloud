@@ -47,6 +47,16 @@ const SAMPLE_DEFAULT_TEXTS = new Set([
 ]);
 
 export async function POST(req: NextRequest) {
+  const musetalkUrlCheck = process.env.TALKINGHEAD_SERVER_URL || process.env.MUSETALK_SERVER_URL || "http://localhost:8010";
+  if (
+    process.env.NODE_ENV === "production" &&
+    (musetalkUrlCheck.includes("localhost") || musetalkUrlCheck.includes("127.0.0.1"))
+  ) {
+    return NextResponse.json(
+      { error: "Direct localhost MuseTalk streaming is disabled in production; use the local GPU worker.", remoteWorkerRequired: true },
+      { status: 503 }
+    );
+  }
   try {
     const body = await req.json();
     const parsed = StreamPipelineRequestSchema.safeParse(body);

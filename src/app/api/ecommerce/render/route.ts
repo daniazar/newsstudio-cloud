@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit,rateLimitResponse,RateLimitTiers } from "@/lib/security/rateLimit";
 import { assertSafePublicUrl } from "@/lib/security/ssrf";
 import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
 import { type ChildProcess } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
@@ -704,6 +705,8 @@ export async function POST(req: NextRequest) {
     log.info(
       `[Remotion E-Commerce] Enqueued render job ${job.id} (${quality || "master"}): ${compositionId} (${totalFrames} frames, duration=${(totalFrames / 30).toFixed(1)}s)`
     );
+
+    void broadcastWorkerWake("job_queued");
 
     return NextResponse.json({
       success: true,

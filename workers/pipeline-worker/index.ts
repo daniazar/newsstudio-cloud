@@ -1,12 +1,28 @@
 /**
  * workers/pipeline-worker/index.ts
  *
- * Standalone Pipeline Worker: polls the database queue, coordinates AI generation tasks,
- * executes atomic job claiming, manages background GPU model servers, and executes headless Remotion rendering.
+ * Standalone Pipeline Worker: wakes instantly via Supabase Realtime Broadcast
+ * or local HTTP loopback (:8765), executes local-first agy/Ollama LLM tasks
+ * and GenerationJobs, manages GPU model servers, and runs headless Remotion renders.
+ * Makes zero idle HTTP requests to MAIN_APP_URL while sleeping.
  */
 
+process.env.IS_PIPELINE_WORKER = "true";
+if (!process.env.AGY_MODEL) process.env.AGY_MODEL = "gemini-3.8-flash-low";
+if (!process.env.AGY_EFFORT) process.env.AGY_EFFORT = "low";
+
+import http from "http";
 import { config, validateConfig } from "./config";
-import { pollQueue, claimJob, reportProgress, sendHeartbeat, triggerAutoPublish } from "./api";
+import {
+  pollQueue,
+  claimJob,
+  reportProgress,
+  sendHeartbeat,
+  triggerAutoPublish,
+  claimLlmTask,
+  completeLlmTask,
+  triggerScheduledRun,
+} from "./api";
 import type { QueuedJob } from "./api";
 import { executeRenderTask } from "./render-task";
 import {
@@ -27,10 +43,18 @@ import { stepImage } from "./tasks/imageTask";
 import { stepStudioJob } from "./tasks/studioTask";
 import { stepTurntable3D } from "./tasks/turntable3dTask";
 import { stepWardrobeInpaint } from "./tasks/wardrobeInpaintTask";
+import { stepEcommerceMediaTask, ECOMMERCE_MEDIA_JOB_TYPES } from "./tasks/ecommerceMediaTask";
 import { prisma } from "@/lib/prisma";
 import { PRICING } from "@/lib/constants/pricing";
 import { sendOperationalAlert } from "@/lib/alerting/notifier";
 import { createLogger } from "@/lib/logger";
+import {
+  resolveSupabaseConfigFromEnv,
+  startSupabaseRealtimeListener,
+  checkSupabaseQueuedJobs,
+  checkSupabaseDueSchedules,
+  runLocalLlm,
+} from "@/lib/worker-broker";
 
 const workerLog = createLogger({
   module: "pipeline-worker",
@@ -44,7 +68,13 @@ let isShuttingDown = false;
 let isProcessing = false;
 let currentJobId: string | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+let wakeServer: http.Server | null = null;
+let realtimeStop: (() => void) | null = null;
+let sleepCancel: (() => void) | null = null;
+let pendingWakeReason: string | null = null;
+let isDrainingLlm = false;
+let pendingLlmDrain = false;
+const workerStartedAt = Date.now();
 
 let modernTtsIdleTimeout: ReturnType<typeof setTimeout> | null = null;
 let modernTalkingHeadIdleTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -188,6 +218,12 @@ export async function processJob(queuedJob: QueuedJob): Promise<void> {
   currentJobId = jobId;
   isProcessing = true;
 
+  // Send heartbeats ONLY while actively processing a job (zero idle heartbeats)
+  void heartbeat();
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => void heartbeat(), config.heartbeatIntervalMs);
+  heartbeatTimer.unref?.();
+
   const job = claim.job!;
   const story = claim.story;
   const jobLog = workerLog.child({
@@ -209,7 +245,9 @@ export async function processJob(queuedJob: QueuedJob): Promise<void> {
       return;
     }
 
-    if (job.type === "turntable_3d") {
+    if ((ECOMMERCE_MEDIA_JOB_TYPES as readonly string[]).includes(String(job.type))) {
+      await stepEcommerceMediaTask(job, jobId);
+    } else if (job.type === "turntable_3d") {
       // 3D Product Turntable — pure HTTP orchestration against Object3D-Server (:8020).
       // No local GPU servers are started; the Object3D stack manages its own VRAM.
       await stepTurntable3D(job, jobId);
@@ -364,6 +402,10 @@ export async function processJob(queuedJob: QueuedJob): Promise<void> {
       }).catch(() => {});
     }
   } finally {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
     isProcessing = false;
     currentJobId = null;
 
@@ -402,6 +444,170 @@ export async function poll(): Promise<void> {
   }
 }
 
+function interruptibleSleep(ms: number): Promise<"woken" | "timeout"> {
+  if (pendingWakeReason !== null) {
+    return Promise.resolve("woken");
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      sleepCancel = null;
+      resolve("timeout");
+    }, ms);
+    timer.unref?.();
+
+    sleepCancel = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      sleepCancel = null;
+      resolve("woken");
+    };
+  });
+}
+
+function wakeWorker(reason: string): void {
+  pendingWakeReason = reason;
+  void drainLlmTasks();
+  if (sleepCancel) {
+    sleepCancel();
+  }
+}
+
+async function drainLlmTasks(): Promise<void> {
+  if (isShuttingDown) return;
+  if (isDrainingLlm) {
+    pendingLlmDrain = true;
+    return;
+  }
+  isDrainingLlm = true;
+  try {
+    do {
+      pendingLlmDrain = false;
+      while (!isShuttingDown) {
+        const task = await claimLlmTask(config.workerId);
+        if (!task) break;
+        const started = Date.now();
+        try {
+          const res = await runLocalLlm({
+            prompt: task.prompt,
+            systemPrompt: task.systemPrompt,
+            schema: task.schema,
+            model: task.model,
+            effort: task.effort,
+          });
+          await completeLlmTask(task.taskId, {
+            status: "done",
+            text: res.text,
+            model: res.model,
+            engine: res.engine,
+            inputTokens: res.inputTokens,
+            outputTokens: res.outputTokens,
+          });
+          workerLog.info(
+            { taskId: task.taskId, engine: res.engine, model: res.model, durationMs: Date.now() - started },
+            "Completed local broker LLM task"
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await completeLlmTask(task.taskId, {
+            status: "failed",
+            error: errMsg,
+          }).catch(() => {});
+          workerLog.warn({ taskId: task.taskId, err: errMsg }, "Local broker LLM task failed");
+        }
+      }
+    } while (pendingLlmDrain && !isShuttingDown);
+  } catch (err) {
+    workerLog.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Error draining LLM tasks"
+    );
+  } finally {
+    isDrainingLlm = false;
+  }
+}
+
+async function drainJobQueue(): Promise<void> {
+  let processedAny = false;
+  while (!isShuttingDown && !isProcessing) {
+    const job = await pollQueue();
+    if (!job) break;
+    processedAny = true;
+    workerLog.info(`\n📬 Found queued job: ${job.id} (story: ${job.storyId})`);
+    await processJob(job);
+  }
+
+  if (processedAny && !isShuttingDown && !isProcessing) {
+    await new Promise((r) => setTimeout(r, 800));
+    while (!isShuttingDown && !isProcessing) {
+      const followUp = await pollQueue();
+      if (!followUp) break;
+      workerLog.info(`\n📬 Found follow-up job: ${followUp.id} (story: ${followUp.storyId})`);
+      await processJob(followUp);
+    }
+  }
+}
+
+function startLocalWakeServer(): void {
+  const server = http.createServer((req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const reqPath = (req.url || "/").split("?")[0];
+
+    if (reqPath === "/wake") {
+      wakeWorker("http_wake");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, woken: true, workerId: config.workerId }));
+      return;
+    }
+
+    if (reqPath === "/status" || reqPath === "/health") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          workerId: config.workerId,
+          role: config.role,
+          engine: config.engine,
+          isProcessing,
+          currentJobId,
+          uptimeSec: Math.round((Date.now() - workerStartedAt) / 1000),
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Not found" }));
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      workerLog.warn(`Wake loopback port 127.0.0.1:${config.wakePort} already in use; relying on Supabase Realtime`);
+    } else {
+      workerLog.warn({ err: err.message }, "Local wake server error");
+    }
+  });
+
+  server.listen(config.wakePort, "127.0.0.1", () => {
+    workerLog.info(`🔔 Local HTTP wake server listening on http://127.0.0.1:${config.wakePort}`);
+  });
+
+  wakeServer = server;
+}
+
 async function heartbeat(): Promise<void> {
   const type = config.role === "video" && config.engine ? `video_${config.engine}` : config.role;
   const mem = process.memoryUsage();
@@ -425,8 +631,25 @@ function shutdown(signal: string): void {
 
   workerLog.info(`\n⚡ Received ${signal} — shutting down gracefully...`);
 
-  if (pollTimer) clearInterval(pollTimer);
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (realtimeStop) {
+    realtimeStop();
+    realtimeStop = null;
+  }
+  if (wakeServer) {
+    try {
+      wakeServer.close();
+    } catch {
+      // ignore
+    }
+    wakeServer = null;
+  }
+  if (sleepCancel) {
+    sleepCancel();
+  }
 
   stopModernTtsServer();
   stopComfyUIServer();
@@ -505,23 +728,64 @@ export async function main(): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  await heartbeat();
-  heartbeatTimer = setInterval(heartbeat, config.heartbeatIntervalMs);
+  startLocalWakeServer();
+
+  const supaCfg = resolveSupabaseConfigFromEnv();
+  if (supaCfg) {
+    const listener = startSupabaseRealtimeListener(supaCfg, {
+      onWake: (reason) => wakeWorker(reason),
+      onLog: (msg) => workerLog.info(msg),
+    });
+    realtimeStop = listener.stop;
+  } else {
+    workerLog.warn("⚠️  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset — Realtime wake disabled; relying on HTTP :8765 wake and safety sleep.");
+  }
 
   workerLog.info(
     {
       workerId: config.workerId,
       role: config.role,
       engine: config.engine,
-      pollIntervalMs: config.pollIntervalMs,
+      dbSafetyPollMs: config.dbSafetyPollMs,
+      wakePort: config.wakePort,
     },
-    "NewsStudio Pipeline Worker initialized"
+    "NewsStudio Pipeline Worker initialized (zero-idle-poll mode)"
   );
 
-  workerLog.info(`\n🔍 Polling for jobs every ${config.pollIntervalMs}ms...\n`);
-  pollTimer = setInterval(poll, config.pollIntervalMs);
+  // Initial startup drain (only hits Railway if Supabase reports queued work or Supabase env is unset)
+  const shouldDrainOnBoot = !supaCfg || (await checkSupabaseQueuedJobs(supaCfg));
+  if (shouldDrainOnBoot) {
+    await drainLlmTasks();
+    await drainJobQueue();
+  }
 
-  await poll();
+  while (!isShuttingDown) {
+    const wakeOutcome = await interruptibleSleep(config.dbSafetyPollMs);
+    if (isShuttingDown) break;
+
+    if (wakeOutcome === "woken") {
+      pendingWakeReason = null;
+      await drainLlmTasks();
+      await drainJobQueue();
+      continue;
+    }
+
+    // 15m safety sweep: query Supabase PostgREST directly (<300 bytes) with 0 Railway traffic when idle
+    if (supaCfg) {
+      const dueSchedules = await checkSupabaseDueSchedules(supaCfg);
+      for (const sched of dueSchedules) {
+        await triggerScheduledRun(sched.id).catch(() => {});
+      }
+      const hasJobs = await checkSupabaseQueuedJobs(supaCfg);
+      if (hasJobs || dueSchedules.length > 0) {
+        await drainLlmTasks();
+        await drainJobQueue();
+      }
+    } else {
+      await drainLlmTasks();
+      await drainJobQueue();
+    }
+  }
 }
 
 if (!process.env.VITEST && process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("pipeline-worker/index.ts")) {

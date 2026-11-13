@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { reserveQuota, QuotaExceededError } from "@/lib/quota/quotaEngine";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 
 /**
  * POST /api/pipeline/start
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
         config: Object.keys(effectiveConfig).length > 0 ? JSON.stringify(effectiveConfig) : null,
       },
     });
+    void broadcastWorkerWake("job_queued");
 
     return Response.json({ jobId: job.id, status: job.status, totalSteps, config: effectiveConfig });
   } catch (error) {

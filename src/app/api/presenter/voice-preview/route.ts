@@ -6,6 +6,12 @@ export async function POST(req: Request) {
     const { personaId, text, language = 'es' } = body
 
     const ttsServerUrl = process.env.MODERN_TTS_SERVER_URL || 'http://localhost:8005'
+    if (process.env.NODE_ENV === 'production' && (ttsServerUrl.includes('localhost') || ttsServerUrl.includes('127.0.0.1'))) {
+      return NextResponse.json(
+        { error: 'Direct localhost voice preview is disabled in production. Use the local worker queue.', remoteWorkerRequired: true },
+        { status: 503 }
+      )
+    }
     const res = await fetch(`${ttsServerUrl}/api/presenter/voice-preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

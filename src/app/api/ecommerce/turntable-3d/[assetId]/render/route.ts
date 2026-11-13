@@ -7,6 +7,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
 import {
   TURNTABLE_3D_JOB_TYPE,
   TURNTABLE_3D_TOTAL_STEPS,
@@ -112,6 +113,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
       return createdJob;
     });
+
+    void broadcastWorkerWake("job_queued");
 
     return Response.json({ jobId: job.id, asset3DId: asset.id }, { status: 202 });
   } catch (error) {

@@ -21,13 +21,21 @@ import { requireTenant } from "@/lib/tenant";
 import { getPersonaBroadcastPrompt,getPersonaById,getPersonaNeutralHeadshotPrompt,getPersonaNudeBase } from "@/lib/tts/personas";
 import { getAlgorithmicActionLoop } from "@/lib/types/stateMachine";
 import { generateLlmText } from "@/lib/llm/aiSdkGateway";
-import { execFile } from "child_process";
 import fs from "fs";
 import { NextRequest,NextResponse } from "next/server";
 import os from "os";
 import path from "path";
 import { promisify } from "util";
 import { z } from "zod";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
 
 // Download an audio/video asset by its key or URL, returning Buffer via storage abstraction
 async function downloadAsset(assetPathOrUrl: string): Promise<Buffer> {
@@ -53,7 +61,44 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api:presenter:generate-scene");
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = async (file: string, args: string[]) => {
+  const { execFile } = await import("child_process");
+  return promisify(execFile)(file, args);
+};
+
+export async function GET(req: NextRequest) {
+  const t = await requireTenant();
+  if (!t.ok) return t.response;
+  const { orgId } = t.tenant;
+
+  const jobId = new URL(req.url).searchParams.get("jobId");
+  if (!jobId) {
+    return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+  }
+
+  const job = await prisma.generationJob.findFirst({
+    where: { id: jobId, companyId: orgId },
+  });
+  if (!job) {
+    return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  }
+
+  let parsedConfig: Record<string, unknown> = {};
+  try {
+    parsedConfig = job.config ? (JSON.parse(job.config) as Record<string, unknown>) : {};
+  } catch {}
+
+  return NextResponse.json({
+    ok: true,
+    jobId: job.id,
+    status: job.status,
+    currentStep: job.currentStep,
+    doneSteps: job.doneSteps,
+    totalSteps: job.totalSteps,
+    error: job.errorLog || undefined,
+    result: parsedConfig.result ?? null,
+  });
+}
 
 function resolveCachedAvatarId(candidates: (string | undefined | null)[]): string | null {
   const avatarsDir = path.join(process.cwd(), "storage", "cache", "avatars");
@@ -109,6 +154,103 @@ export async function POST(req: NextRequest) {
   if (!t.ok) return t.response;
   const { orgId } = t.tenant;
 
+  const PayloadSchema = z.object({
+    segmentId: z.string(),
+    storyId: z.string(),
+    model: z.enum([
+      "1.3b",
+      "14b",
+      "sadtalker",
+      "echomimic",
+      "ltx",
+      "ltx_audio",
+      "ltx_flfv_tts",
+      "ltx_flfv_generated",
+      "ltx_multi_persona",
+      "ltx_sfx",
+      "ltx_music_video",
+      "eros",
+      "sulphur",
+      "musetalk",   // MuseTalk 40 FPS realtime lip-sync (port 8010)
+      "ditto",      // Ditto Motion-Space diffusion (port 8010/8012)
+      "liveportrait_musetalk", // Inverted MuseTalk -> LivePortrait hybrid digital human
+      "keysync",    // KeySync 2-stage cached lip-sync (port 8008)
+      "hunyuan",    // HunyuanVideo 1.5
+      "minimax",    // MiniMax H3
+      "taomate",    // MiniMax H3 + TaoMate LoRA
+      "veo",        // Google Veo 3.1 Cloud API
+      "wan",        // Wan 2.1
+    ]).optional().default("1.3b"),
+    personaId: z.string().optional(),
+    avatarUrl: z.string().optional(),
+    actionLoop: z.string().optional(),
+    onlyGenerateImage: z.boolean().optional().default(false)
+  });
+
+  if (isRemoteWorkerMode()) {
+    const rawBody = await req.json().catch(() => null);
+    const parsedData = PayloadSchema.safeParse(rawBody);
+    if (!parsedData.success) {
+      return NextResponse.json(
+        { error: "Invalid payload parameters", details: parsedData.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const {
+      segmentId,
+      storyId,
+      model,
+      personaId: providedPersonaId,
+      avatarUrl: providedAvatarUrl,
+      actionLoop: providedActionLoop,
+      onlyGenerateImage,
+    } = parsedData.data;
+
+    const segment = await prisma.segment.findFirst({
+      where: { id: segmentId, script: { story: { companyId: orgId } } },
+      select: { id: true },
+    });
+    if (!segment) {
+      return NextResponse.json({ error: `Segment ${segmentId} not found` }, { status: 404 });
+    }
+
+    await prisma.segment.update({
+      where: { id: segmentId },
+      data: { presenterStatus: "queued" },
+    });
+
+    const job = await prisma.generationJob.create({
+      data: {
+        companyId: orgId,
+        storyId,
+        type: onlyGenerateImage ? "image" : "video_full",
+        status: "QUEUED",
+        totalSteps: 2,
+        doneSteps: 0,
+        currentStep: "Queued for local worker",
+        config: JSON.stringify({
+          segmentId,
+          storyId,
+          model,
+          personaId: providedPersonaId,
+          avatarUrl: providedAvatarUrl,
+          actionLoop: providedActionLoop,
+          onlyGenerateImage,
+        }),
+      },
+    });
+    void broadcastWorkerWake("job_queued");
+
+    return NextResponse.json({
+      ok: true,
+      queued: true,
+      jobId: job.id,
+      status: "QUEUED",
+      segmentId,
+    });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -130,38 +272,6 @@ export async function POST(req: NextRequest) {
         }, 15000);
 
         const body = await req.json();
-        const PayloadSchema = z.object({
-          segmentId: z.string(),
-          storyId: z.string(),
-          model: z.enum([
-            "1.3b",
-            "14b",
-            "sadtalker",
-            "echomimic",
-            "ltx",
-            "ltx_audio",
-            "ltx_flfv_tts",
-            "ltx_flfv_generated",
-            "ltx_multi_persona",
-            "ltx_sfx",
-            "ltx_music_video",
-            "eros",
-            "sulphur",
-            "musetalk",   // MuseTalk 40 FPS realtime lip-sync (port 8010)
-            "ditto",      // Ditto Motion-Space diffusion (port 8010/8012)
-            "liveportrait_musetalk", // Inverted MuseTalk -> LivePortrait hybrid digital human
-            "keysync",    // KeySync 2-stage cached lip-sync (port 8008)
-            "hunyuan",    // HunyuanVideo 1.5
-            "minimax",    // MiniMax H3
-            "taomate",    // MiniMax H3 + TaoMate LoRA
-            "veo",        // Google Veo 3.1 Cloud API
-            "wan",        // Wan 2.1
-          ]).optional().default("1.3b"),
-          personaId: z.string().optional(),
-          avatarUrl: z.string().optional(),
-          actionLoop: z.string().optional(),
-          onlyGenerateImage: z.boolean().optional().default(false)
-        });
 
         const parsedData = PayloadSchema.safeParse(body);
         if (!parsedData.success) {

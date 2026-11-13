@@ -31,8 +31,13 @@ import { calculateLlmCost } from "@/lib/llm/tokenTracker";
 import { register, resetInstrumentationForTests, isTelemetryInitialized } from "@/instrumentation";
 import { globalUndiciAgent, pooledFetch } from "@/lib/network/httpPool";
 import { prisma } from "@/lib/prisma";
-import { POST as settingsPost, PUT as settingsPut, maskAdminSettings } from "@/app/api/admin/settings/route";
+import { POST as settingsPost, PUT as settingsPut } from "@/app/api/admin/settings/route";
+import { maskAdminSettings } from "@/lib/admin/settingsMask";
 import { sendHeartbeat } from "../../workers/pipeline-worker/api";
+
+vi.mock("@vercel/otel", () => ({
+  registerOTel: vi.fn(),
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 
 interface RouteParams {
   params: Promise<{ jobId: string }>;
@@ -53,6 +54,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         },
       })
     ]);
+    void broadcastWorkerWake("job_queued");
 
     return Response.json({ success: true, message: "Job retried" });
   } catch (error) {

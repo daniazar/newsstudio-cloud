@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
-import { inngest } from "@/inngest/client";
+import { requireWorkerKey } from "@/lib/workerAuth";
+import { dispatchExecuteSchedule } from "@/lib/orchestration/dispatch";
 import { getNextRunEstimate } from "@/lib/types/scheduler";
 
 interface RouteContext {
@@ -138,49 +139,38 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
 /**
  * POST /api/admin/schedules/[id]
- * Manual trigger — "Run Now" button.
- * Sends an Inngest event to execute this schedule immediately.
+ * Manual trigger ("Run Now") or worker-triggered due schedule execution.
  */
-export async function POST(_request: NextRequest, context: RouteContext) {
-  const t = await requireTenant();
-  if (!t.ok) return t.response;
-  const { orgId } = t.tenant;
+export async function POST(request: NextRequest, context: RouteContext) {
+  const workerErr = requireWorkerKey(request);
+  let orgId: string | null = null;
+  const isWorkerCall = !workerErr;
+
+  if (workerErr) {
+    const t = await requireTenant();
+    if (!t.ok) return t.response;
+    orgId = t.tenant.orgId;
+  }
 
   const { id } = await context.params;
 
   try {
-    const schedule = await prisma.schedule.findFirst({ where: { id, companyId: orgId } });
+    const schedule = isWorkerCall
+      ? await prisma.schedule.findUnique({ where: { id } })
+      : await prisma.schedule.findFirst({ where: { id, companyId: orgId! } });
+
     if (!schedule) {
       return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
     }
 
-    // Send Inngest event to execute the schedule
-    try {
-      await inngest.send({
-        name: "news/execute-schedule",
-        data: { scheduleId: id, manual: true, companyId: orgId },
-      });
-    } catch (inngestError) {
-      console.warn("[Schedules API] Inngest send failed, executing directly:", inngestError);
-      // Fallback: execute directly if Inngest is not available
-      // This creates a run record so the UI shows something
-      await prisma.scheduleRun.create({
-        data: {
-          scheduleId: id,
-          status: "FAILED",
-          errorLog: "Inngest is not available. Please ensure Inngest dev server is running.",
-          completedAt: new Date(),
-        },
-      });
-      await prisma.schedule.update({
-        where: { id },
-        data: { lastRunAt: new Date(), lastRunStatus: "FAILED" },
-      });
-      return NextResponse.json({ 
-        success: false, 
-        warning: "Inngest is not available. Schedule run was marked as failed." 
-      }, { status: 202 });
-    }
+    const effectiveCompanyId = orgId ?? schedule.companyId;
+    void dispatchExecuteSchedule({
+      scheduleId: id,
+      manual: !isWorkerCall,
+      companyId: effectiveCompanyId,
+    }).catch((err) => {
+      console.error("[Schedules API] Async schedule execution failed:", err);
+    });
 
     return NextResponse.json({ success: true, message: "Schedule execution triggered" });
   } catch (e) {

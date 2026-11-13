@@ -21,13 +21,12 @@ import {
   resolvePersonaAvatarRef,
 } from "../lib/thumbnail/thumbnailEngine";
 import { getComfyUIUrl, getWsUrl, checkComfyUIHealth } from "../lib/ai/comfy/api";
+import * as comfyApiModule from "../lib/ai/comfy/api";
 import { PERSONAS, getPersonaById } from "../lib/tts/personas";
 import * as imageGenModule from "../lib/ai/comfy/imageGen";
 import { handleImageGeneration, handleThumbnailGeneration } from "../../workers/pipeline-worker/handlers/imageGeneration";
 import { storage } from "../lib/storage";
 import * as pipelineApi from "../../workers/pipeline-worker/api";
-import { GET, POST } from "../app/api/tools/thumbnail/generate/route";
-import { NextRequest } from "next/server";
 
 describe("Stream 4: Docker-Ready Decoupled Thumbnail Engine & Image Worker Suite", () => {
   const originalEnv = process.env;
@@ -200,50 +199,13 @@ describe("Stream 4: Docker-Ready Decoupled Thumbnail Engine & Image Worker Suite
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 5. Web Thumbnail Generator API Route Handler
-  // ─────────────────────────────────────────────────────────────────────────
-  describe("5. Thumbnail Generator API Route (/api/tools/thumbnail/generate)", () => {
-    it("should return catalog presets and personas on GET request", async () => {
-      const response = await GET();
-      expect(response.status).toBe(200);
-
-      const data = await response.json();
-      expect(data.hookPresets).toHaveLength(6);
-      expect(data.availablePersonas.length).toBeGreaterThan(5);
-      expect(data.aspectRatios).toEqual(["16:9", "9:16"]);
-      expect(data.defaultSetup.personaId).toBe("ruby");
-    });
-
-    it("should handle POST request and synthesize thumbnail data", async () => {
-      const req = new NextRequest("http://localhost:3000/api/tools/thumbnail/generate", {
-        method: "POST",
-        body: JSON.stringify({
-          personaId: "ruby",
-          hookPresetKey: "breaking_shock",
-          headline: "QUANTUM BREAKTHROUGH DISRUPTS MARKETS",
-          badgeText: "BREAKING",
-          aspectRatio: "16:9",
-          textPosition: "left",
-          dryRun: true,
-        }),
-      });
-
-      const response = await POST(req);
-      expect(response.status).toBe(200);
-
-      const data = await response.json();
-      expect(data.success).toBe(true);
-      expect(data.persona.id).toBe("ruby");
-      expect(data.aspectRatio).toBe("16:9");
-      expect(data.predictedCtr).toBeGreaterThan(10);
-      expect(data.prompt).toContain("QUANTUM BREAKTHROUGH DISRUPTS MARKETS");
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
   // 6. Pipeline Worker Decoupled Image Generation Handler
   // ─────────────────────────────────────────────────────────────────────────
   describe("6. Pipeline Worker Decoupled Image Handler", () => {
+    beforeEach(() => {
+      vi.spyOn(comfyApiModule, "checkComfyUIHealth").mockResolvedValue(true);
+    });
+
     it("should execute handleImageGeneration and upload to tenant-scoped storage key", async () => {
       const result = await handleImageGeneration({
         jobId: "job_thumb_001",

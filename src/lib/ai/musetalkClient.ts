@@ -110,11 +110,12 @@ export async function generateMuseTalkLipSync(
       effectiveVideoPath = path.join(tempDir, `avatar-loop-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.mp4`);
       
       log.info(`🖼️ [MuseTalk Client] Converting static avatar image to video driver: ${videoPath} -> ${effectiveVideoPath}`);
-      const { execFileSync } = await import("child_process");
-      execFileSync(
+      const { execFile } = await import("child_process");
+      const { promisify } = await import("util");
+      await promisify(execFile)(
         ffmpeg,
         ["-y", "-loop", "1", "-i", videoPath, "-t", "0.2", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-r", "10", effectiveVideoPath],
-        { stdio: "ignore" }
+        { timeout: 15_000, windowsHide: true }
       );
       tempVideoCreated = true;
     }

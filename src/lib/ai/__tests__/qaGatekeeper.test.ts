@@ -6,7 +6,6 @@ import {
   QaDefect,
   QaDefectSchema,
 } from "../qaGatekeeper";
-import { parseArgs } from "../../../../scripts/ecommerce-ad-cli";
 
 const generateLlmObjectMock = vi.fn();
 
@@ -81,14 +80,6 @@ describe("Pre-Publication QA Gatekeeper Unit Tests", () => {
     expect(report.dimensions.safeZone).toBeDefined();
     expect(report.dimensions.brandSafety).toBeDefined();
     expect(report.summary).toContain("Pre-flight heuristic");
-  });
-
-  it("parses --audit flag in ecommerce-ad-cli", () => {
-    const opts = parseArgs(["--sample=flooring", "--audit"]);
-    expect(opts.audit).toBe(true);
-
-    const defaultOpts = parseArgs(["--sample=flooring"]);
-    expect(defaultOpts.audit).toBe(false);
   });
 
   describe("auditVideoFramesWithGemini via Multimodal AI SDK Gateway", () => {

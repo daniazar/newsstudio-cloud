@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
+const publicS3Url = process.env.NEXT_PUBLIC_S3_PUBLIC_URL?.replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   // Only produce standalone distribution in Docker CI/CD environments or production
@@ -16,7 +17,9 @@ const nextConfig: NextConfig = {
           { protocol: "https", hostname: "cdn.pixabay.com" },
           { protocol: "https", hostname: "pixabay.com" },
           { protocol: "https", hostname: "images.unsplash.com" },
+          { protocol: "https", hostname: "*.r2.dev" },
           { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+          { protocol: "https", hostname: "*.supabase.co" },
           { protocol: "https", hostname: "*.blob.core.windows.net" },
           { protocol: "https", hostname: "*.storage.googleapis.com" },
           { protocol: "https", hostname: "*.amazonaws.com" },
@@ -27,6 +30,20 @@ const nextConfig: NextConfig = {
           { protocol: "http", hostname: "127.0.0.1" },
         ],
   },
+  // Rewrite static avatar & studio plate requests directly to Cloudflare R2 when NEXT_PUBLIC_S3_PUBLIC_URL is configured
+  async rewrites() {
+    if (!publicS3Url) return [];
+    return [
+      {
+        source: "/avatars/:path*",
+        destination: `${publicS3Url}/avatars/:path*`,
+      },
+      {
+        source: "/studio_plates/:path*",
+        destination: `${publicS3Url}/studio_plates/:path*`,
+      },
+    ];
+  },
   // Cap static generation workers to 4 (prevents 23 workers from exhausting RAM and thrashing pagefile)
   experimental: {
     cpus: 4,
@@ -36,15 +53,16 @@ const nextConfig: NextConfig = {
     maxInactiveAge: 15 * 60 * 1000, // Keep inactive compiled pages warm for 15 minutes
     pagesBufferLength: 6,           // Retain up to 6 inactive compiled pages in memory
   },
-  cacheMaxMemorySize: 50 * 1024 * 1024, // 50MB in-memory cache limit
+  // Tuned for 512 MB Railway RAM in production
+  cacheMaxMemorySize: isProd ? 16 * 1024 * 1024 : 50 * 1024 * 1024,
   // Treat heavy native modules as external so Webpack doesn't load/parse them in memory
   serverExternalPackages: [
-    "better-sqlite3",
-    "@prisma/adapter-better-sqlite3",
     "@prisma/client",
+    "@remotion/cli",
+    "@remotion/renderer",
     "puppeteer-core",
+    "ws",
     "chat",
-    "discord.js",
     "@discordjs/ws",
     "@chat-adapter/discord",
     "@chat-adapter/slack",
@@ -74,6 +92,10 @@ const nextConfig: NextConfig = {
     if (!isServer) {
       config.output = config.output || {};
       config.output.chunkLoadTimeout = 300000;
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        undici: false,
+      };
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -101,6 +123,9 @@ const nextConfig: NextConfig = {
         "node:url": false,
         zlib: false,
         "node:zlib": false,
+        async_hooks: false,
+        "node:async_hooks": false,
+        undici: false,
       };
 
       if (webpack) {
@@ -211,7 +236,7 @@ const nextConfig: NextConfig = {
               `img-src 'self' blob: data: https:${isProd ? "" : " http://localhost:* http://127.0.0.1:*"}`,
               "font-src 'self' https://fonts.gstatic.com data:",
               `media-src 'self' blob: data: https:${isProd ? "" : " http://localhost:* http://127.0.0.1:*"}`,
-              `connect-src 'self' blob: data: ws: wss:${isProd ? "" : " http:"} https: https://*.clerk.accounts.dev https://api.clerk.com`,
+              `connect-src 'self' blob: data: ws: wss: http://127.0.0.1:8765 https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://*.r2.cloudflarestorage.com https://*.clerk.accounts.dev https://api.clerk.com${isProd ? "" : " http:"}`,
               "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",

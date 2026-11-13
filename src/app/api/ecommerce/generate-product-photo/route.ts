@@ -15,21 +15,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
-import { findAndSyncArtifact } from "../../../../../scripts/gemini-cli/artifactManager";
 import { sanitizeDiffusionPrompt } from "@/lib/ecommerce/promptSafetyFilter";
 import {
   resolvePersonaAttireImageUrl,
   buildConditionedReferenceUrls,
 } from "@/lib/ecommerce/personaPromptHelper";
-import { initJobLogging, cliLogger } from "../../../../../scripts/common/cliTelemetry";
 import { requireTenant } from "@/lib/tenant";
 import { checkRateLimit, rateLimitResponse, RateLimitTiers } from "@/lib/security/rateLimit";
 import { createLogger } from "@/lib/logger";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
 
 const log = createLogger("api:ecommerce:generate-product-photo");
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+function mapGenerationJobStatus(status: string): "pending" | "processing" | "completed" | "failed" {
+  if (status === "DONE") return "completed";
+  if (status === "FAILED" || status === "CANCELLED") return "failed";
+  return "processing";
+}
 
 export interface PhotoSceneJob {
   id: string;
@@ -81,11 +93,45 @@ export async function GET(req: NextRequest) {
   if (!t.ok) return t.response;
 
   try {
+    const orgId = t.tenant.orgId;
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get("jobId");
     const productId = searchParams.get("productId");
 
-    // 1. Direct jobId match
+    // 0. Check Prisma GenerationJob first when jobId is provided and not in local memory map
+    if (jobId && !photoSceneJobs.has(jobId)) {
+      const dbJob = await prisma.generationJob.findFirst({
+        where: { id: jobId, companyId: orgId },
+      });
+      if (dbJob) {
+        let parsedConfig: Record<string, unknown> = {};
+        try {
+          parsedConfig = dbJob.config ? (JSON.parse(dbJob.config) as Record<string, unknown>) : {};
+        } catch {}
+        const resultObj =
+          parsedConfig.result && typeof parsedConfig.result === "object"
+            ? (parsedConfig.result as Record<string, unknown>)
+            : {};
+        const mappedStatus = mapGenerationJobStatus(dbJob.status);
+        const startedMs = dbJob.startedAt ? dbJob.startedAt.getTime() : Date.now();
+        return NextResponse.json({
+          success: true,
+          jobId: dbJob.id,
+          status: mappedStatus,
+          jobStatus: dbJob.status,
+          progress:
+            typeof resultObj.progress === "string"
+              ? resultObj.progress
+              : dbJob.currentStep || (dbJob.status === "QUEUED" ? "Waiting for local worker..." : "Generating product photo..."),
+          imageUrl: typeof resultObj.imageUrl === "string" ? resultObj.imageUrl : undefined,
+          elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedMs) / 1000)),
+          error: mappedStatus === "failed" ? dbJob.errorLog || "Product photo generation failed" : undefined,
+          logs: Array.isArray(resultObj.logs) ? resultObj.logs : [],
+        });
+      }
+    }
+
+    // 1. Direct jobId match in local memory map
     if (jobId && photoSceneJobs.has(jobId)) {
       const job = photoSceneJobs.get(jobId)!;
 
@@ -234,6 +280,8 @@ async function executePhotoJobAsync(
 ) {
   let stdout = "";
   let stderr = "";
+  const { initJobLogging, cliLogger } = await import("../../../../../scripts/common/cliTelemetry");
+  const { findAndSyncArtifact } = await import("../../../../../scripts/gemini-cli/artifactManager");
 
   try {
     initJobLogging(job.id, "gemini");
@@ -280,8 +328,6 @@ async function executePhotoJobAsync(
       const promptFile = path.join(geminiDir, `temp_photo_prompt_${timestamp}.txt`);
       fs.writeFileSync(promptFile, prompt.trim(), "utf8");
 
-      const isWin = process.platform === "win32";
-
       cliLogger.stage(
         "RENDERING_DIFFUSION",
         "Synthesizing high-fidelity scene texture, architectural lighting & character likeness with Imagen 3 / Gemini...",
@@ -308,6 +354,7 @@ async function executePhotoJobAsync(
       }
 
       const executable = process.execPath;
+      const { spawn } = await import("child_process");
 
       const child = spawn(
         executable,
@@ -531,11 +578,8 @@ export async function POST(req: NextRequest) {
 
     const isCli = configuredBackend === "cli" || configuredBackend === "agy";
 
-    // Ensure output directory exists
+    // Ensure output directory exists (local mode only)
     const outputDir = path.resolve(process.cwd(), "public/assets/ecommerce/product_photos");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
 
     const timestamp = Date.now();
     const cleanId = String(productId).replace(/[^a-z0-9_-]/gi, "_");
@@ -605,6 +649,64 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        imageUrl: publicUrl,
+        prompt: cleanPrompt,
+        aspectRatio,
+        backend: isCli ? "cli" : "api",
+        referenceImageUrls: candidateUrls,
+        stagedRefPaths: [],
+        dryRun: true,
+      });
+    }
+
+    if (isRemoteWorkerMode()) {
+      const createdJob = await prisma.generationJob.create({
+        data: {
+          companyId: orgId,
+          storyId: String(productId || "ecommerce_photo"),
+          type: "ecommerce_photo",
+          status: "QUEUED",
+          totalSteps: 2,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            productId: String(productId || "prod"),
+            productName: _productName || null,
+            prompt: cleanPrompt,
+            aspectRatio,
+            category,
+            referenceImageUrls: candidateUrls,
+            personaId: effectivePersona,
+            attireId: attireId || null,
+            avatarSrc: avatarSrc || null,
+            actionLoopId: actionLoopId || null,
+            videoUrl: videoUrl || null,
+            backend: isCli ? "cli" : "api",
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json({
+        ok: true,
+        queued: true,
+        success: true,
+        jobId: createdJob.id,
+        status: "QUEUED",
+        progress: "Queued for local worker — waiting to start...",
+        message: "Queued for local worker execution.",
+        backend: isCli ? "cli" : "api",
+        referenceCount: candidateUrls.length,
+      });
+    }
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
     const stagedRefPaths: string[] = [];
     const stagingDir = path.resolve(process.cwd(), "public/assets/ecommerce/product_photos/staged_refs");
     if (!fs.existsSync(stagingDir)) {
@@ -641,19 +743,6 @@ export async function POST(req: NextRequest) {
       } catch (imgErr) {
         console.warn(`[generate-product-photo] Could not stage reference image ${url}:`, imgErr);
       }
-    }
-
-    if (dryRun) {
-      return NextResponse.json({
-        success: true,
-        imageUrl: publicUrl,
-        prompt: cleanPrompt,
-        aspectRatio,
-        backend: isCli ? "cli" : "api",
-        referenceImageUrls: candidateUrls,
-        stagedRefPaths,
-        dryRun: true,
-      });
     }
 
     // Initialize Job in Map

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 
 /**
  * POST /api/pipeline/image
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
         }),
       },
     });
+    void broadcastWorkerWake("job_queued");
 
     return Response.json({ jobId: job.id, status: job.status });
   } catch (error) {

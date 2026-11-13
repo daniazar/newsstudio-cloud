@@ -13,7 +13,7 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("realtime:audioFeatureService");
 
-import type { AudioFeatureMeta } from "../../../vendor/viseme-compositor-core/packages/core/src/types";
+import type { AudioFeatureMeta } from "./types";
 export type { AudioFeatureMeta };
 
 const PUBLIC_AUDIO_FEAT_DIR = path.join(process.cwd(), "public", "assets", "audio_features");

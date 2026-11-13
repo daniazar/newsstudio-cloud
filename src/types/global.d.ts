@@ -1,6 +1,3 @@
-import { LiveAnchorStageEngine } from "@/lib/realtime/liveAnchorStageEngine";
-import { WebGLVisemeCompositor } from "@/lib/realtime/webglVisemeCompositor";
-import { VisemeCodebookService } from "@/lib/realtime/visemeCodebook";
 export interface PlatePreset {
   id: string;
   name: string;
@@ -10,12 +7,12 @@ export interface PlatePreset {
 
 declare global {
   interface Window {
-    __stageEngine?: LiveAnchorStageEngine | null;
-    __engine?: LiveAnchorStageEngine | null;
+    __stageEngine?: unknown;
+    __engine?: unknown;
     __renderSingleFrame?: (frameIdx: number, subframeFactor: number) => void;
-    __compositor?: WebGLVisemeCompositor | null;
-    __webglCompositor?: WebGLVisemeCompositor | null;
-    __codebookService?: VisemeCodebookService | null;
+    __compositor?: unknown;
+    __webglCompositor?: unknown;
+    __codebookService?: unknown;
     __loadCodebook?: (type: "ditto" | "ditto_fullface" | "musetalk" | "none") => Promise<string | undefined | void>;
     __setManualClusterId?: (cid: number) => void;
     __setHeadYaw?: (yaw: number) => void;

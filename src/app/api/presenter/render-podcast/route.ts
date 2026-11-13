@@ -11,6 +11,12 @@ export const POST = withTenantAuth(async (req: NextRequest) => {
   }
 
   const ttsServerUrl = process.env.MODERN_TTS_SERVER_URL || 'http://localhost:8005';
+  if (process.env.NODE_ENV === 'production' && (ttsServerUrl.includes('localhost') || ttsServerUrl.includes('127.0.0.1'))) {
+    return NextResponse.json(
+      { error: 'Direct localhost podcast rendering is disabled in production. Use the local worker queue.', remoteWorkerRequired: true },
+      { status: 503 }
+    );
+  }
   
   // Call python podcast renderer endpoint
   const res = await fetch(`${ttsServerUrl}/api/tts/render-podcast`, {

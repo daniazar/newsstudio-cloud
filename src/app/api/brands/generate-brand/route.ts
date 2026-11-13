@@ -3,15 +3,13 @@ import { requireTenant } from "@/lib/tenant";
 import { generateLlmObject } from "@/lib/llm/aiSdkGateway";
 import { z } from "zod";
 
-export const BrandProfileSchema = z.object({
+const BrandProfileSchema = z.object({
   name: z.string().catch("News Channel"),
   handle: z.string().catch("newschannel"),
   description: z.string().catch("Breaking news and insightful analysis."),
   avatarPrompt: z.string().catch("Photorealistic 3D news network logo with obsidian and metallic gold accents"),
   tags: z.array(z.string()).catch(["news", "breaking", "world", "markets", "tech"]),
 });
-
-export type BrandProfile = z.infer<typeof BrandProfileSchema>;
 
 export async function POST(request: NextRequest) {
   const t = await requireTenant();

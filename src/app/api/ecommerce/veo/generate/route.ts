@@ -6,10 +6,64 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { spawn } from "child_process";
 import fs from "fs";
+import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { assertSafePublicUrl } from "@/lib/security/ssrf";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+export async function GET(req: NextRequest) {
+  const t = await requireTenant();
+  if (!t.ok) return t.response;
+  const orgId = t.tenant.orgId;
+
+  const jobId = new URL(req.url).searchParams.get("jobId");
+  if (!jobId) {
+    return NextResponse.json({ success: false, error: "jobId is required" }, { status: 400 });
+  }
+
+  const job = await prisma.generationJob.findFirst({
+    where: { id: jobId, companyId: orgId },
+  });
+  if (!job) {
+    return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
+  }
+
+  let parsedConfig: Record<string, unknown> = {};
+  try {
+    parsedConfig = job.config ? (JSON.parse(job.config) as Record<string, unknown>) : {};
+  } catch {}
+  const resultObj =
+    parsedConfig.result && typeof parsedConfig.result === "object"
+      ? (parsedConfig.result as Record<string, unknown>)
+      : {};
+  const mappedStatus =
+    job.status === "DONE"
+      ? "completed"
+      : job.status === "FAILED" || job.status === "CANCELLED"
+      ? "failed"
+      : "processing";
+
+  return NextResponse.json({
+    success: true,
+    jobId: job.id,
+    status: mappedStatus,
+    jobStatus: job.status,
+    progress: job.currentStep || (job.status === "QUEUED" ? "Queued for local worker..." : "Generating Veo video..."),
+    videoUrl: typeof resultObj.videoUrl === "string" ? resultObj.videoUrl : undefined,
+    manifestPath: typeof resultObj.manifestPath === "string" ? resultObj.manifestPath : null,
+    manifest: resultObj.manifest ?? null,
+    error: mappedStatus === "failed" ? job.errorLog || "Veo generation failed" : undefined,
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -67,6 +121,50 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (isRemoteWorkerMode()) {
+      if (dryRun) {
+        return NextResponse.json({
+          success: true,
+          dryRun: true,
+          queued: false,
+          message: "Dry-run validated in remote worker mode.",
+        });
+      }
+
+      const job = await prisma.generationJob.create({
+        data: {
+          companyId: t.tenant.orgId,
+          storyId: `ecommerce_veo_${Date.now()}`,
+          type: "ecommerce_veo",
+          status: "QUEUED",
+          totalSteps: 2,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            productName: productName.trim(),
+            productImage: productImage || null,
+            productCategory,
+            productAction,
+            personaSlug,
+            fuseBeats: Boolean(fuseBeats),
+            withAudio: Boolean(withAudio),
+            bgmGenre,
+            sfxCue,
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json({
+        ok: true,
+        queued: true,
+        success: true,
+        jobId: job.id,
+        status: "QUEUED",
+        message: "Veo product showcase job queued for local worker.",
+      });
+    }
+
     // Build CLI arguments for spawn (safe array, no shell execution)
     const args: string[] = [
       "tsx",
@@ -88,6 +186,7 @@ export async function POST(req: NextRequest) {
 
     const executable = process.platform === "win32" ? "npx.cmd" : "npx";
     const cwd = process.cwd();
+    const { spawn } = await import("child_process");
 
     const { stdout, stderr, code } = await new Promise<{ stdout: string; stderr: string; code: number | null }>(
       (resolve, reject) => {

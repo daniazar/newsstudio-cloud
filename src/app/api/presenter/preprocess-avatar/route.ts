@@ -70,6 +70,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const musetalkUrl = process.env.TALKINGHEAD_SERVER_URL || process.env.MUSETALK_SERVER_URL || "http://localhost:8010";
   const talkingHeadUrl = process.env.TALKINGHEAD_SERVER_URL || process.env.TALKING_HEAD_SERVER_URL || "http://localhost:8010";
+  if (
+    process.env.NODE_ENV === "production" &&
+    (musetalkUrl.includes("localhost") || musetalkUrl.includes("127.0.0.1"))
+  ) {
+    return NextResponse.json(
+      { error: "Direct localhost avatar preprocessing is disabled in production; run on the local GPU worker.", remoteWorkerRequired: true },
+      { status: 503 }
+    );
+  }
 
   try {
     const contentType = req.headers.get("content-type") || "";

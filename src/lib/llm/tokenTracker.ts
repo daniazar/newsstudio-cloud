@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 export interface LlmUsagePayload {
-  provider: "gemini" | "ollama" | "openai-compatible" | string;
+  provider: "gemini" | "ollama" | "openai-compatible" | "agy" | string;
   model: string;
   promptTokens?: number;
   completionTokens?: number;
@@ -23,7 +23,7 @@ export function calculateLlmCost(
   promptTokens: number,
   completionTokens: number
 ): number {
-  if (provider === "ollama") {
+  if (provider === "ollama" || provider === "agy") {
     return 0.0;
   }
 

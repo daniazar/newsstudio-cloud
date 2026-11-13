@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { promisify } from "util";
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import { storage, generateKey } from "@/lib/storage";
 import { reportProgress, updateSegment } from "../api";
 import { generateAudioWithModernTts } from "@/lib/tts/modernTtsClient";
@@ -24,7 +24,6 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("worker:tasks:audioTask");
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 export interface WorkerSegment {

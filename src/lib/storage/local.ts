@@ -68,6 +68,14 @@ export class LocalStorageClient implements StorageClient {
     return this.getUrl(key);
   }
 
+  async getPresignedUploadUrl(key: string, _contentType: string, _expiresInSeconds: number = 3600): Promise<string> {
+    return this.getUrl(key);
+  }
+
+  async getPresignedReadUrl(key: string, _expiresInSeconds: number = 3600): Promise<string> {
+    return this.getUrl(key);
+  }
+
   async exists(key: string): Promise<boolean> {
     const fullPath = this.getFullPath(key);
     return existsSync(fullPath);

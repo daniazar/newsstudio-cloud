@@ -70,8 +70,11 @@ async function measureLatency<T>(fn: () => Promise<T>): Promise<{ result: T; lat
 export async function checkDatabaseHealth(): Promise<ServiceStatus> {
   try {
     const { latency } = await measureLatency(async () => {
-      // Direct raw query is the safest ping
-      await prisma.$queryRaw`SELECT 1`;
+      // Direct raw query with timeout guard
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("DB health timeout")), 1500)),
+      ]);
     });
     return { status: "online", latencyMs: latency };
   } catch (error) {
@@ -82,7 +85,10 @@ export async function checkDatabaseHealth(): Promise<ServiceStatus> {
 export async function checkStorageHealth(): Promise<ServiceStatus> {
   try {
     const { latency } = await measureLatency(async () => {
-      await storage.exists("__healthcheck__");
+      await Promise.race([
+        storage.exists("__healthcheck__"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Storage health timeout")), 1500)),
+      ]);
     });
     return { status: "online", latencyMs: latency };
   } catch (error) {

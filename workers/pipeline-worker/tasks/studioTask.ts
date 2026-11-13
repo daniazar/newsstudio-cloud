@@ -13,6 +13,7 @@ import { storage, withTenant } from "@/lib/storage";
 import { createTenantSandbox, cleanupTenantSandbox } from "@/lib/storage/sandbox";
 import { runMultimodalQACheck } from "@/lib/qa/qualityGatekeeper";
 import { reportProgress } from "../api";
+import { resolveLocalAvatarFile } from "../config";
 import { generateAudioWithModernTts, generateDialogueBatch } from "@/lib/tts/modernTtsClient";
 import {
   getRemotionEntryPoint,
@@ -182,13 +183,23 @@ export async function stepStudioJob(
 
     for (const slug of Array.from(personaSlugs)) {
       if (isShuttingDown()) break;
-      const refPath = path.join(process.cwd(), `public/avatars/${slug}_ref.png`);
-      const fallbackPath = path.join(process.cwd(), `public/avatars/${slug}.png`);
-      const resolvedRef = fs.existsSync(refPath)
-        ? refPath
-        : fs.existsSync(fallbackPath)
-        ? fallbackPath
-        : path.join(process.cwd(), "public/avatars/ruby_ref.png");
+      let resolvedRef =
+        resolveLocalAvatarFile(`${slug}_ref.png`) ||
+        resolveLocalAvatarFile(`${slug}.png`) ||
+        resolveLocalAvatarFile("ruby_ref.png") ||
+        resolveLocalAvatarFile("ruby.png") ||
+        undefined;
+      if (!resolvedRef) {
+        try {
+          const buf = await storage.download(`avatars/${slug}.png`).catch(() => storage.download("avatars/ruby.png"));
+          const tmpRef = path.join(process.cwd(), "scratch", "tmp", `avatar-${slug}.png`);
+          fs.mkdirSync(path.dirname(tmpRef), { recursive: true });
+          fs.writeFileSync(tmpRef, buf);
+          resolvedRef = tmpRef;
+        } catch {
+          resolvedRef = undefined;
+        }
+      }
 
       const attire = getRandomStudioAttire();
       const compiled = compilePresenterPrompt({
@@ -334,9 +345,13 @@ export async function stepStudioJob(
       log.info(`     Generating lip-sync for turn ${i + 1}/${turns.length} (${speakerId})...`);
       try {
         const audioBuf = await storage.download(turn.audioPath);
-        const imageBuf = await storage
-          .download(imageKey)
-          .catch(() => fs.readFileSync(path.join(process.cwd(), `public/avatars/${speakerId}.png`)));
+        const imageBuf = await storage.download(imageKey).catch(async () => {
+          const localAvatar =
+            resolveLocalAvatarFile(`${speakerId}.png`) ||
+            resolveLocalAvatarFile("ruby.png");
+          if (localAvatar) return fs.readFileSync(localAvatar);
+          return storage.download(`avatars/${speakerId}.png`).catch(() => storage.download("avatars/ruby.png"));
+        });
 
         const tmpAudio = path.join(process.cwd(), `scratch/tmp/turn-${jobId}-${i}.wav`);
         const tmpImg = path.join(process.cwd(), `scratch/tmp/turn-${jobId}-${i}.png`);

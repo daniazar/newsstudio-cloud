@@ -4,7 +4,6 @@ import {
   parseGoogleMerchantXml,
   parseWooCommerceRss,
 } from "../storefrontCrawler";
-import { parseArgs } from "../../../../scripts/ecommerce-ad-cli";
 
 describe("Storefront Catalog & RSS Feed Ingestion Unit Tests", () => {
   it("parses Shopify /products.json format into normalized ProductSpec[]", () => {
@@ -106,15 +105,5 @@ describe("Storefront Catalog & RSS Feed Ingestion Unit Tests", () => {
     expect(p.title).toBe("Glow Serum 30ml");
     expect(p.sourceUrl).toBe("https://skincareshop.com/product/glow-serum/");
     expect(p.assets[0].url).toBe("https://skincareshop.com/wp-content/uploads/serum.jpg");
-  });
-
-  it("parses --crawl and --limit flags in ecommerce-ad-cli", () => {
-    const opts = parseArgs(["--crawl=https://store.allbirds.com", "--limit=8"]);
-    expect(opts.crawl).toBe("https://store.allbirds.com");
-    expect(opts.limit).toBe(8);
-
-    const defaultOpts = parseArgs(["--sample=flooring"]);
-    expect(defaultOpts.crawl).toBeUndefined();
-    expect(defaultOpts.limit).toBeUndefined();
   });
 });

@@ -38,6 +38,20 @@ export async function POST(req: Request) {
       );
     }
 
+    const isRemote =
+      process.env.NODE_ENV === "production" ||
+      process.env.FORCE_REMOTE_WORKER === "true";
+
+    if (isRemote && videoPath && !voiceBase64) {
+      return NextResponse.json(
+        {
+          error:
+            "Extracting audio from a local video file requires local worker mode or providing voiceBase64 directly.",
+        },
+        { status: 400 }
+      );
+    }
+
     const result = await clonePersonaFromImage({
       imageBase64,
       imagePath,

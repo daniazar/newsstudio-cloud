@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateChromaDistance } from '../../remotion/layers/ChromaKeyPresenterLayer';
+import { calculateChromaDistance } from '../remotion/layers/ChromaKeyPresenterLayer';
 
 describe('Sprint L-2: Chroma-Key Presenter Layer', () => {
   it('should calculate zero distance for pure green screen pixel', () => {

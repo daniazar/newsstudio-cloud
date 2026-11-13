@@ -9,22 +9,35 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { getDownloadsDir } from "@/lib/binaries";
-import { findAndSyncVideoArtifact } from "../../../../../scripts/veo-cli/artifactManager";
 import { sanitizeDiffusionPrompt } from "@/lib/ecommerce/promptSafetyFilter";
 import {
   resolvePersonaAttireImageUrl,
   buildConditionedReferenceUrls,
 } from "@/lib/ecommerce/personaPromptHelper";
 import { createLogger } from "@/lib/logger";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
 
 const log = createLogger("api:ecommerce:generate-custom-scene");
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+function mapGenerationJobStatus(status: string): "pending" | "processing" | "completed" | "failed" {
+  if (status === "DONE") return "completed";
+  if (status === "FAILED" || status === "CANCELLED") return "failed";
+  return "processing";
+}
 
 export interface VeoSceneJob {
   id: string;
@@ -103,13 +116,56 @@ export async function GET(req: NextRequest) {
   try {
     const t = await requireTenant();
     if (!t.ok) return t.response;
+    const orgId = t.tenant.orgId;
 
-    loadPersistedJobs();
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get("jobId");
     const productId = searchParams.get("productId");
     const sceneIndexParam = searchParams.get("sceneIndex");
     const sceneIndex = sceneIndexParam !== null ? Number(sceneIndexParam) : null;
+
+    // 0. Check Prisma GenerationJob first when jobId is provided and not in local memory map
+    if (jobId && !veoSceneJobs.has(jobId)) {
+      const dbJob = await prisma.generationJob.findFirst({
+        where: { id: jobId, companyId: orgId },
+      });
+      if (dbJob) {
+        let parsedConfig: Record<string, unknown> = {};
+        try {
+          parsedConfig = dbJob.config ? (JSON.parse(dbJob.config) as Record<string, unknown>) : {};
+        } catch {}
+        const resultObj =
+          parsedConfig.result && typeof parsedConfig.result === "object"
+            ? (parsedConfig.result as Record<string, unknown>)
+            : {};
+        const mappedStatus = mapGenerationJobStatus(dbJob.status);
+        const startedMs = dbJob.startedAt ? dbJob.startedAt.getTime() : Date.now();
+        return NextResponse.json({
+          success: true,
+          jobId: dbJob.id,
+          status: mappedStatus,
+          jobStatus: dbJob.status,
+          progress:
+            typeof resultObj.progress === "string"
+              ? resultObj.progress
+              : dbJob.currentStep || (dbJob.status === "QUEUED" ? "Waiting for local worker..." : "Generating Veo scene..."),
+          videoUrl: typeof resultObj.videoUrl === "string" ? resultObj.videoUrl : undefined,
+          elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedMs) / 1000)),
+          error: mappedStatus === "failed" ? dbJob.errorLog || "Scene generation failed" : undefined,
+          logs: Array.isArray(resultObj.logs) ? resultObj.logs : [],
+        });
+      }
+    }
+
+    if (isRemoteWorkerMode()) {
+      return NextResponse.json({
+        success: true,
+        status: "idle",
+        message: "No active remote scene generation job found",
+      });
+    }
+
+    loadPersistedJobs();
 
     // 1. Direct or partial jobId match
     let targetJob: VeoSceneJob | undefined = undefined;
@@ -315,8 +371,6 @@ async function executeVeoJobAsync(
       const promptFile = path.join(geminiDir, `temp_veo_prompt_${timestamp}.txt`);
       fs.writeFileSync(promptFile, prompt.trim(), "utf8");
 
-      const isWin = process.platform === "win32";
-
       const logsDir = path.join(process.cwd(), ".gemini", "logs");
       if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
       const jobLogFile = path.join(logsDir, `job_${job.id}.log`);
@@ -357,6 +411,7 @@ async function executeVeoJobAsync(
       spawnArgs.push("--non-interactive");
 
       const executable = process.execPath;
+      const { spawn } = await import("child_process");
 
       const child = spawn(
         executable,
@@ -471,6 +526,7 @@ async function executeVeoJobAsync(
     if (job.videoFilePath && fs.existsSync(job.videoFilePath) && fs.statSync(job.videoFilePath).size > 100000) {
       resolvedVideoUrl = job.videoUrl || null;
     } else {
+      const { findAndSyncVideoArtifact } = await import("../../../../../scripts/veo-cli/artifactManager");
       const syncedPath = findAndSyncVideoArtifact(baseName, timestamp - 10000, job.videoFilePath!);
       if (syncedPath && fs.existsSync(syncedPath) && fs.statSync(syncedPath).size > 100000) {
         resolvedVideoUrl = job.videoUrl || null;
@@ -537,6 +593,10 @@ async function executeVeoJobAsync(
  */
 export async function POST(req: NextRequest) {
   try {
+    const t = await requireTenant();
+    if (!t.ok) return t.response;
+    const orgId = t.tenant.orgId;
+
     const body = await req.json();
     const {
       productId,
@@ -586,12 +646,7 @@ export async function POST(req: NextRequest) {
 
     const isCli = configuredBackend === "cli" || configuredBackend === "agy";
 
-    // Ensure output directory exists
     const outputDir = path.resolve(process.cwd(), "public/assets/ecommerce/veo_scenes");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
     const timestamp = Date.now();
     const cleanId = String(productId || "prod").replace(/[^a-z0-9_-]/gi, "_");
     const baseName = `veo_custom_${cleanId}_scene${sceneIndex}_${timestamp}`;
@@ -600,7 +655,7 @@ export async function POST(req: NextRequest) {
     const videoPublicUrl = `/assets/ecommerce/veo_scenes/${videoFileName}`;
 
     // -------------------------------------------------------------
-    // 1. GATHER & STAGE CONDITIONED REFERENCES (Persona First, then Products)
+    // 1. GATHER & CONDITION REFERENCES (Persona First, then Products)
     // -------------------------------------------------------------
     let incomingUrls: string[] = [];
     if (Array.isArray(referenceImageUrls)) {
@@ -661,6 +716,68 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        videoUrl: videoPublicUrl,
+        prompt: prompt.trim(),
+        cameraCue,
+        duration: effectiveDuration,
+        aspectRatio,
+        backend: isCli ? "cli" : "api",
+        stagedRefPaths: [],
+        dryRun: true,
+      });
+    }
+
+    if (isRemoteWorkerMode()) {
+      const createdJob = await prisma.generationJob.create({
+        data: {
+          companyId: orgId,
+          storyId: String(productId || cleanId),
+          type: "ecommerce_scene",
+          status: "QUEUED",
+          totalSteps: 2,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            kind: "custom_scene",
+            productId: String(productId || cleanId),
+            productName: _productName || null,
+            sceneIndex: Number(sceneIndex),
+            prompt: cleanPrompt,
+            cameraCue,
+            duration: effectiveDuration,
+            aspectRatio,
+            personaId: effectivePersona,
+            attireId: attireId || null,
+            avatarSrc: avatarSrc || null,
+            actionLoopId: actionLoopId || null,
+            videoUrl: videoUrl || null,
+            referenceImageUrls: candidateUrls,
+            backend: isCli ? "cli" : "api",
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json({
+        ok: true,
+        queued: true,
+        success: true,
+        jobId: createdJob.id,
+        status: "QUEUED",
+        pollIntervalMs: 3000,
+        estimatedSeconds: 75,
+        message: "Veo 3.1 scene job queued for local worker. Poll GET with jobId.",
+        stagedReferencePhotosCount: candidateUrls.length,
+      });
+    }
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
     const stagedRefPaths: string[] = [];
     const stagingDir = path.resolve(process.cwd(), "public/assets/ecommerce/product_photos/staged_refs");
     if (!fs.existsSync(stagingDir)) {
@@ -697,20 +814,6 @@ export async function POST(req: NextRequest) {
       } catch (imgErr) {
         console.warn(`[generate-custom-scene] Could not stage reference image ${url}:`, imgErr);
       }
-    }
-
-    if (dryRun) {
-      return NextResponse.json({
-        success: true,
-        videoUrl: videoPublicUrl,
-        prompt: prompt.trim(),
-        cameraCue,
-        duration: effectiveDuration,
-        aspectRatio,
-        backend: isCli ? "cli" : "api",
-        stagedRefPaths,
-        dryRun: true,
-      });
     }
 
     // -------------------------------------------------------------

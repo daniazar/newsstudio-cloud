@@ -4,7 +4,7 @@ import { clonePersonaFromImage } from "@/lib/personas/personaCloner";
 import { generateLlmObject } from "@/lib/llm/aiSdkGateway";
 import { z } from "zod";
 
-export const PersonaFullTraitsSchema = z.object({
+const PersonaFullTraitsSchema = z.object({
   age: z.number().catch(34),
   heightCm: z.number().catch(175),
   heightFeet: z.string().catch("5'9\""),
@@ -19,7 +19,7 @@ export const PersonaFullTraitsSchema = z.object({
   defaultLighting: z.string().catch("Three-point key lighting"),
 });
 
-export const PersonaFullProfileSchema = z.object({
+const PersonaFullProfileSchema = z.object({
   slug: z.string().catch("news_anchor"),
   name: z.string().catch("Broadcast Presenter"),
   role: z.string().catch("News Anchor"),
@@ -30,8 +30,6 @@ export const PersonaFullProfileSchema = z.object({
   systemPrompt: z.string().catch("You are an authoritative and engaging news presenter delivering clear, accurate coverage."),
   traits: PersonaFullTraitsSchema,
 });
-
-export type PersonaFullProfile = z.infer<typeof PersonaFullProfileSchema>;
 
 const SYSTEM_INSTRUCTION = `You are an expert AI persona architect and visual character designer.
 Analyze the user's concept and design a professional AI News Presenter persona profile.

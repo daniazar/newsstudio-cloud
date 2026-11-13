@@ -11,6 +11,7 @@ import path from "path";
 import os from "os";
 import { storage, generateKey } from "@/lib/storage";
 import { reportProgress } from "../api";
+import { resolveLocalAvatarFile } from "../config";
 import { generatePresenterImage } from "@/lib/ai/comfy/imageGen";
 import type { LoraConfig } from "@/lib/ai/comfy/image/loraManager";
 import { checkComfyUIHealth, getComfyUIUrl } from "@/lib/ai/comfy/api";
@@ -163,8 +164,10 @@ export async function handleImageGeneration(
       );
     } else {
       console.warn("⚠️ [Image Handler] ComfyUI server is offline. Using high-res persona avatar fallback.");
-      const fallbackPath = faceRefAbsPath || path.join(process.cwd(), "public/avatars/ruby.png");
-      generatedBuffer = fs.readFileSync(fallbackPath);
+      const fallbackPath = faceRefAbsPath || resolveLocalAvatarFile("ruby.png");
+      generatedBuffer = fallbackPath
+        ? fs.readFileSync(fallbackPath)
+        : await storage.download("avatars/ruby.png");
     }
 
     // 4. Upload generated image to tenant storage

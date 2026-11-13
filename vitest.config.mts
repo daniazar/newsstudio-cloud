@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    maxWorkers: 4,
+    teardownTimeout: 5000,
     setupFiles: [],
     include: ["**/*.test.ts", "**/*.test.tsx", "__tests__/**/*.test.ts"],
     exclude: [

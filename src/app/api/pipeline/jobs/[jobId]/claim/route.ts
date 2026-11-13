@@ -40,11 +40,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     let targetStatus = "TTS_IN_PROGRESS";
-    if (["video", "video_full", "video_bubble", "musetalk", "ditto", "veo", "minimax", "taomate", "ltx"].includes(existingJob.type)) {
+    if (["video", "video_full", "video_bubble", "musetalk", "ditto", "veo", "minimax", "taomate", "ltx", "ecommerce_veo", "ecommerce_lipsync"].includes(existingJob.type)) {
       targetStatus = "VIDEO_IN_PROGRESS";
-    } else if (existingJob.type === "render") {
+    } else if (existingJob.type === "render" || existingJob.type === "ecommerce_render") {
       targetStatus = "RENDER_IN_PROGRESS";
-    } else if (existingJob.type === "image") {
+    } else if (["image", "ecommerce_photo", "ecommerce_scene", "persona_studio_image"].includes(existingJob.type)) {
       targetStatus = "IMAGE_IN_PROGRESS";
     } else if (existingJob.type === "turntable_3d") {
       targetStatus = "TURNTABLE_IN_PROGRESS";
@@ -74,9 +74,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return Response.json({ claimed: false });
     }
 
-    // Image generation and 3D turntable jobs have no associated story or voice configs
-    // (turntable_3d carries the ProductCampaign id in storyId).
-    if (job.type === "image" || job.type === "turntable_3d") {
+    // Image generation, 3D turntable, and async e-commerce/persona media jobs
+    // carry their payload directly inside job.config instead of a Story/Script.
+    if (
+      [
+        "image",
+        "turntable_3d",
+        "ecommerce_photo",
+        "ecommerce_scene",
+        "ecommerce_veo",
+        "ecommerce_lipsync",
+        "ecommerce_render",
+        "persona_studio_image",
+      ].includes(job.type)
+    ) {
       return Response.json({
         claimed: true,
         job: {

@@ -122,10 +122,12 @@ function formatMb(mb: number): string {
 }
 
 export default function AdminTelemetryPage() {
+  const [liveMonitor, setLiveMonitor] = useState(false);
+
   const { data, mutate, isValidating } = useSWR<TelemetryData>(
     "/api/admin/telemetry",
     fetcher,
-    { refreshInterval: 4000 }
+    { refreshInterval: liveMonitor ? 10_000 : 0, revalidateOnFocus: false }
   );
 
   const { data: memData, mutate: mutateMem } = useSWR<{
@@ -143,7 +145,10 @@ export default function AdminTelemetryPage() {
       usedHeapSizeMB: number;
       heapSizeLimitMB: number;
     };
-  }>("/api/health/memory", fetcher, { refreshInterval: 4000 });
+  }>("/api/health/memory", fetcher, {
+    refreshInterval: liveMonitor ? 10_000 : 0,
+    revalidateOnFocus: false,
+  });
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -383,6 +388,19 @@ export default function AdminTelemetryPage() {
           >
             <PowerOff className="w-3.5 h-3.5" />
             <span>Free All AI VRAM</span>
+          </button>
+
+          <button
+            onClick={() => setLiveMonitor((prev) => !prev)}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer shadow-sm active:scale-95 ${
+              liveMonitor
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                : "bg-surface-raised/90 border-border/80 hover:bg-white/[0.08] text-muted"
+            }`}
+            title="Toggle 10s telemetry polling (off by default to stay idle)"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>{liveMonitor ? "Live (10s)" : "Live: Off"}</span>
           </button>
 
           <button

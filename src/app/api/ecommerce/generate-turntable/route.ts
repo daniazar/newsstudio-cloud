@@ -11,7 +11,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -31,8 +30,22 @@ import {
 import { compileTurntablePrompt, detectStagingArchetype } from "@/lib/ecommerce/turntablePromptCompiler";
 import { resolveContextualEnvironment } from "@/lib/ecommerce/turntableEnvironmentEngine";
 import { checkComfyUIHealth, getComfyUIUrl, submitPrompt, uploadFileToComfyUI } from "@/lib/ai/comfyClient";
-import { findAndSyncVideoArtifact } from "../../../../../scripts/veo-cli/artifactManager";
 import { sanitizeDiffusionPrompt } from "@/lib/ecommerce/promptSafetyFilter";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+function mapGenerationJobStatus(status: string): "pending" | "processing" | "completed" | "failed" {
+  if (status === "DONE") return "completed";
+  if (status === "FAILED" || status === "CANCELLED") return "failed";
+  return "processing";
+}
 import { resolvePersonaAttireImageUrl } from "@/lib/ecommerce/personaPromptHelper";
 
 declare global {
@@ -350,8 +363,6 @@ async function executeVeoTurntableJobAsync(
       const promptFile = path.join(geminiDir, `temp_veo_turntable_${timestamp}.txt`);
       fs.writeFileSync(promptFile, prompt.trim(), "utf8");
 
-      const isWin = process.platform === "win32";
-
       const logsDir = path.join(process.cwd(), ".gemini", "logs");
       if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
       const jobLogFile = path.join(logsDir, `job_${job.id}.log`);
@@ -396,6 +407,7 @@ async function executeVeoTurntableJobAsync(
       spawnArgs.push("--non-interactive");
 
       const executable = process.execPath;
+      const { spawn } = await import("child_process");
 
       const child = spawn(
         executable,
@@ -537,6 +549,7 @@ async function executeVeoTurntableJobAsync(
       resolvedVideoUrl = job.videoUrl || null;
       finalVideoPath = job.videoFilePath;
     } else {
+      const { findAndSyncVideoArtifact } = await import("../../../../../scripts/veo-cli/artifactManager");
       const syncedPath = findAndSyncVideoArtifact(baseName, timestamp - 10000, job.videoFilePath!);
       if (syncedPath && fs.existsSync(syncedPath) && fs.statSync(syncedPath).size > 100000) {
         resolvedVideoUrl = `/assets/ecommerce/turntables/${path.basename(syncedPath)}`;
@@ -602,6 +615,10 @@ export async function POST(req: NextRequest) {
   try {
     const t = await requireTenant();
     if (!t.ok) return t.response;
+    const orgId =
+      (t.tenant as { orgId?: string; companyId?: string } | undefined)?.orgId ||
+      (t as { companyId?: string }).companyId ||
+      "default";
 
     const body = await req.json();
     const {
@@ -676,10 +693,6 @@ export async function POST(req: NextRequest) {
     const baseName = `turntable_${cleanId}_s${sceneIndex}_${timestamp}`;
 
     const outputDir = path.resolve(process.cwd(), "public/assets/ecommerce/turntables");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
     const videoFileName = `${baseName}.mp4`;
     const videoFilePath = path.join(outputDir, videoFileName);
     const videoPublicUrl = `/assets/ecommerce/turntables/${videoFileName}`;
@@ -689,7 +702,7 @@ export async function POST(req: NextRequest) {
       return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".mov");
     };
 
-    // 1. Gather & stage product and persona reference photos
+    // 1. Gather & condition product and persona reference photos
     const candidateUrls: string[] = [];
     if (productImageUrl && typeof productImageUrl === "string" && productImageUrl.trim() && !isVideoUrl(productImageUrl)) {
       candidateUrls.push(productImageUrl.trim());
@@ -728,6 +741,71 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Dry Run early exit
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        jobId,
+        status: "completed",
+        videoUrl: videoPublicUrl,
+        prompt: cleanPrompt,
+        dryRun: true,
+      });
+    }
+
+    // Remote Worker Mode: enqueue GenerationJob (no local spawn, no localhost ComfyUI, no server setInterval)
+    if (isRemoteWorkerMode()) {
+      const createdJob = await prisma.generationJob.create({
+        data: {
+          companyId: orgId,
+          storyId: String(productId || cleanId),
+          type: "ecommerce_scene",
+          status: "QUEUED",
+          totalSteps: engine === "minimax_h3" && stepMode === "tao_3step" ? 3 : 2,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            kind: "turntable",
+            productId: String(productId || `prod_${timestamp}`),
+            productName: productName.trim(),
+            sceneIndex: Number(sceneIndex),
+            engine,
+            stagingArchetype,
+            motionPreset,
+            pedestalStyle,
+            lightingStyle,
+            cameraElevation,
+            environmentId: activeEnvId,
+            stepMode,
+            prompt: cleanPrompt,
+            personaId,
+            attireId: attireId || null,
+            aspectRatio,
+            duration: effectiveDuration,
+            referenceImageUrls: refUrlsToStage,
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json(
+        {
+          ok: true,
+          queued: true,
+          success: true,
+          jobId: createdJob.id,
+          status: "QUEUED",
+          estimatedDurationSeconds: engine === "minimax_h3" ? 240 : 180,
+          pollUrl: `/api/ecommerce/generate-turntable?jobId=${encodeURIComponent(createdJob.id)}`,
+        },
+        { status: 202 }
+      );
+    }
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
     const stagedRefPaths: string[] = [];
     const stagingDir = path.resolve(process.cwd(), "public/assets/ecommerce/product_photos/staged_refs");
     if (!fs.existsSync(stagingDir)) {
@@ -763,18 +841,6 @@ export async function POST(req: NextRequest) {
       } catch (imgErr) {
         console.warn(`[generate-turntable] Could not stage reference image ${url}:`, imgErr);
       }
-    }
-
-    // Dry Run early exit
-    if (dryRun) {
-      return NextResponse.json({
-        success: true,
-        jobId,
-        status: "completed",
-        videoUrl: videoPublicUrl,
-        prompt: cleanPrompt,
-        dryRun: true,
-      });
     }
 
     // 2. Register TurntableSceneJob
@@ -973,13 +1039,68 @@ export async function GET(req: NextRequest) {
   try {
     const t = await requireTenant();
     if (!t.ok) return t.response;
+    const orgId =
+      (t.tenant as { orgId?: string; companyId?: string } | undefined)?.orgId ||
+      (t as { companyId?: string }).companyId ||
+      "default";
 
-    loadPersistedJobs();
     const { searchParams } = new URL(req.url);
     const jobId = searchParams.get("jobId");
     const productId = searchParams.get("productId");
     const sceneIndexParam = searchParams.get("sceneIndex");
     const sceneIndex = sceneIndexParam !== null ? Number(sceneIndexParam) : null;
+
+    if (jobId && !turntableSceneJobs.has(jobId)) {
+      const dbJob = await prisma.generationJob.findFirst({
+        where: { id: jobId, companyId: orgId },
+      });
+      if (dbJob) {
+        let parsedConfig: Record<string, unknown> = {};
+        try {
+          parsedConfig = dbJob.config ? (JSON.parse(dbJob.config) as Record<string, unknown>) : {};
+        } catch {}
+        const resultObj =
+          parsedConfig.result && typeof parsedConfig.result === "object"
+            ? (parsedConfig.result as Record<string, unknown>)
+            : {};
+        const mappedStatus = mapGenerationJobStatus(dbJob.status);
+        const totalSteps = dbJob.totalSteps || 2;
+        const currentStep = dbJob.doneSteps || 0;
+        const progressPercent =
+          mappedStatus === "completed"
+            ? 100
+            : mappedStatus === "failed"
+            ? 0
+            : Math.min(95, Math.round(((currentStep + 0.5) / totalSteps) * 100));
+        const startedMs = dbJob.startedAt ? dbJob.startedAt.getTime() : Date.now();
+        return NextResponse.json({
+          success: true,
+          id: dbJob.id,
+          jobId: dbJob.id,
+          productId: typeof parsedConfig.productId === "string" ? parsedConfig.productId : dbJob.storyId,
+          sceneIndex: typeof parsedConfig.sceneIndex === "number" ? parsedConfig.sceneIndex : 0,
+          status: mappedStatus,
+          jobStatus: dbJob.status,
+          engine: typeof parsedConfig.engine === "string" ? parsedConfig.engine : "google_veo",
+          stagingArchetype:
+            typeof parsedConfig.stagingArchetype === "string" ? parsedConfig.stagingArchetype : undefined,
+          progress:
+            typeof resultObj.progress === "string"
+              ? resultObj.progress
+              : dbJob.currentStep || (dbJob.status === "QUEUED" ? "Waiting for local worker..." : "Generating turntable..."),
+          videoUrl: typeof resultObj.videoUrl === "string" ? resultObj.videoUrl : undefined,
+          previewGifUrl: typeof resultObj.previewGifUrl === "string" ? resultObj.previewGifUrl : undefined,
+          error: mappedStatus === "failed" ? dbJob.errorLog || "Turntable generation failed" : undefined,
+          currentStep,
+          totalSteps,
+          progressPercent,
+          elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedMs) / 1000)),
+          logs: Array.isArray(resultObj.logs) ? resultObj.logs : [],
+        });
+      }
+    }
+
+    loadPersistedJobs();
 
     let targetJob: TurntableSceneJob | undefined = undefined;
 
@@ -1032,6 +1153,7 @@ export async function GET(req: NextRequest) {
       const cleanId = String(job.productId || "prod").replace(/[^a-z0-9_-]/gi, "_");
       const baseName = job.baseName || `turntable_${cleanId}_s${job.sceneIndex}`;
 
+      const { findAndSyncVideoArtifact } = await import("../../../../../scripts/veo-cli/artifactManager");
       const synced = findAndSyncVideoArtifact(baseName, job.startedAt - 5000, job.videoFilePath);
       if (synced && fs.existsSync(synced)) {
         try {

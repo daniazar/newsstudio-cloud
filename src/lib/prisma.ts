@@ -31,10 +31,11 @@ function createPrismaClient(): PrismaClient {
       max: process.env.DATABASE_POOL_MAX
         ? parseInt(process.env.DATABASE_POOL_MAX, 10)
         : process.env.NODE_ENV === "production"
-        ? 15
+        ? 5
         : 10,
-      idleTimeoutMillis: 30000,
+      idleTimeoutMillis: 15000,
       connectionTimeoutMillis: 5000,
+      allowExitOnIdle: true,
       ssl: needsSsl
         ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true" }
         : undefined,

@@ -29,6 +29,7 @@ generateRandomLoopSequence,
 sliceSequenceForScene,
 } from "@/lib/ecommerce/actionLoopFsmEngine";
 import { useComfyServer } from "@/lib/hooks/useComfyServer";
+import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
 import { usePresenterBatch } from "@/lib/hooks/usePresenterBatch";
 import { useSadTalkerServer } from "@/lib/hooks/useSadTalkerServer";
 import { getPersonaById } from "@/lib/tts/personas";
@@ -1304,6 +1305,7 @@ export default function EditorPage() {
     setIsAutoProducing(true);
     toast("Auto-Producing Episode", "Generating missing TTS, B-roll visuals, and lip-sync videos...", "info");
     try {
+      void pingLocalWorkerWake("auto_produce");
       const res = await fetch(`/api/stories/${storyId}/auto-produce`, { method: "POST" });
       if (res.ok) {
         const freshStory = await fetch(`/api/stories/${storyId}`).then((r) => r.json());
@@ -1327,6 +1329,7 @@ export default function EditorPage() {
         body: JSON.stringify({ quality: renderQuality }),
       });
       if (res.ok) {
+        void pingLocalWorkerWake("render_video");
         toast("Render In Progress", "Video rendering on GPU queue...", "success");
       } else {
         toast("Render Failed", "Could not start render job.", "error");

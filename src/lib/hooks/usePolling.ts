@@ -10,12 +10,14 @@ export interface PollingSettings {
   interval: number; // in seconds
 }
 
+const ENV_DISABLE_POLLING =
+  process.env.NODE_ENV === "production" ||
+  process.env.NEXT_PUBLIC_DISABLE_POLLING === "true";
+
 const DEFAULT_SETTINGS: PollingSettings = {
-  enabled: true,
+  enabled: !ENV_DISABLE_POLLING,
   interval: 30, // 30 seconds default
 };
-
-const ENV_DISABLE_POLLING = process.env.NEXT_PUBLIC_DISABLE_POLLING === "true";
 
 export function usePolling() {
   const [settings, setSettings] = useState<PollingSettings>(DEFAULT_SETTINGS);

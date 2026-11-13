@@ -14,13 +14,11 @@ import {
   Music,
   Trash2,
   ExternalLink,
-  Layers,
   Image as ImageIcon,
   Users,
   ChevronDown,
   RefreshCw,
   Edit3,
-  Tv,
   ShoppingBag,
 } from "lucide-react";
 

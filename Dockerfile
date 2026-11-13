@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat openssl python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# Skip postinstall git submodule clone in container build
+# Skip postinstall scripts in container dependency installation
 RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # ─── Stage 2: Build ───────────────────────────────────────────────────────────
@@ -21,13 +21,15 @@ ENV BUILD_STANDALONE=true
 
 # Build args for public env vars baked into the client bundle
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_S3_PUBLIC_URL
+ARG NEXT_PUBLIC_DISABLE_POLLING=true
 ARG NEXT_PUBLIC_TTS_MODE=server
-ARG NEXT_PUBLIC_DISABLE_POLLING=false
 ARG NEXT_PUBLIC_OBJECT3D_SERVER_URL
 
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ENV NEXT_PUBLIC_TTS_MODE=$NEXT_PUBLIC_TTS_MODE
+ENV NEXT_PUBLIC_S3_PUBLIC_URL=$NEXT_PUBLIC_S3_PUBLIC_URL
 ENV NEXT_PUBLIC_DISABLE_POLLING=$NEXT_PUBLIC_DISABLE_POLLING
+ENV NEXT_PUBLIC_TTS_MODE=$NEXT_PUBLIC_TTS_MODE
 ENV NEXT_PUBLIC_OBJECT3D_SERVER_URL=$NEXT_PUBLIC_OBJECT3D_SERVER_URL
 
 # Generate Prisma Client for PostgreSQL
@@ -69,4 +71,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "--max-old-space-size=384", "server.js"]

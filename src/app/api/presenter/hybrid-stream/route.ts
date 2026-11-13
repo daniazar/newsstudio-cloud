@@ -22,6 +22,15 @@ const LRU_HYBRID_CACHE = new Map<string, Buffer>();
 const MAX_CACHE_ENTRIES = 8;
 
 export async function POST(req: NextRequest) {
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true"
+  ) {
+    return NextResponse.json(
+      { error: "Real-time LivePortrait/MuseTalk streaming requires the local GPU worker.", remoteWorkerRequired: true },
+      { status: 503 }
+    );
+  }
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hybrid_stream_"));
 
   try {

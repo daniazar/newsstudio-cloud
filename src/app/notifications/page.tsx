@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { useToast } from "@/components/global/ToastContainer";
-import { usePolling } from "@/lib/hooks/usePolling";
 import { useInfiniteList } from "@/lib/hooks/useInfiniteList";
 import { InfiniteScrollSentinel } from "@/components/global/InfiniteScrollSentinel";
 
@@ -21,7 +20,6 @@ interface NotificationItem {
 
 export default function NotificationsPage() {
   const { toast } = useToast();
-  const { enabled: pollingEnabled, interval: pollingInterval } = usePolling();
 
   const [search, setSearch] = React.useState("");
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
@@ -48,7 +46,7 @@ export default function NotificationsPage() {
       type: activeTab !== "all" && activeTab !== "unread" ? activeTab : undefined,
       unread: activeTab === "unread" ? "true" : undefined,
     },
-    refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
+    refreshInterval: 0,
   });
   const notificationsLoaded = !isLoadingInitial;
 

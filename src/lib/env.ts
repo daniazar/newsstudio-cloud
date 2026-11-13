@@ -10,6 +10,9 @@ const log = createLogger("env");
 
 export interface AppConfig {
   DATABASE_URL: string;
+  DIRECT_URL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
   LLM_PROVIDER: "gemini" | "ollama";
   GEMINI_API_KEY?: string;
   OLLAMA_BASE_URL: string;
@@ -17,12 +20,14 @@ export interface AppConfig {
   STORAGE_PROVIDER: "local" | "minio" | "azure" | "r2";
   S3_ENDPOINT: string;
   NEXT_PUBLIC_S3_ENDPOINT?: string;
+  NEXT_PUBLIC_S3_PUBLIC_URL?: string;
   S3_ACCESS_KEY?: string;
   S3_SECRET_KEY?: string;
   S3_BUCKET_NAME: string;
   MAIN_APP_URL: string;
   MODERN_TTS_SERVER_URL: string;
   COMFYUI_URL: string;
+  VENDOR_ROOT?: string;
   REMOTION_CONCURRENCY: number;
   LOG_LEVEL: LogLevel;
   NODE_ENV: "development" | "production" | "test";
@@ -56,6 +61,9 @@ function parseEnv(): AppConfig {
 
   const config: AppConfig = {
     DATABASE_URL: process.env.DATABASE_URL || "postgresql://newsstudio:newsstudiopassword@localhost:5432/newsstudio?schema=public",
+    DIRECT_URL: process.env.DIRECT_URL?.trim() || undefined,
+    SUPABASE_URL: process.env.SUPABASE_URL?.trim() || undefined,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined,
     LLM_PROVIDER: llmProvider,
     GEMINI_API_KEY: (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim() || undefined,
     OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
@@ -63,12 +71,14 @@ function parseEnv(): AppConfig {
     STORAGE_PROVIDER: storageProvider,
     S3_ENDPOINT: process.env.S3_ENDPOINT || "http://localhost:9000",
     NEXT_PUBLIC_S3_ENDPOINT: process.env.NEXT_PUBLIC_S3_ENDPOINT,
+    NEXT_PUBLIC_S3_PUBLIC_URL: process.env.NEXT_PUBLIC_S3_PUBLIC_URL?.trim() || undefined,
     S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
     S3_SECRET_KEY: process.env.S3_SECRET_KEY,
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME || "news-studio",
     MAIN_APP_URL: process.env.MAIN_APP_URL || "http://localhost:3000",
     MODERN_TTS_SERVER_URL: process.env.MODERN_TTS_SERVER_URL || process.env.NEXT_PUBLIC_MODERN_TTS_SERVER_URL || "http://localhost:8005",
     COMFYUI_URL: process.env.COMFYUI_URL || process.env.NEXT_PUBLIC_COMFYUI_URL || "http://localhost:8188",
+    VENDOR_ROOT: process.env.VENDOR_ROOT || undefined,
     REMOTION_CONCURRENCY: remotionConcurrency,
     LOG_LEVEL: logLevel,
     NODE_ENV: nodeEnv,
@@ -83,13 +93,13 @@ function parseEnv(): AppConfig {
     }
 
     if (config.LLM_PROVIDER === "gemini" && !config.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is required in production when LLM_PROVIDER='gemini'");
+      log.warn("GEMINI_API_KEY is unset in production while LLM_PROVIDER='gemini'. Local worker LLM runs first, but cloud fallback may be limited.");
     }
 
     if (config.STORAGE_PROVIDER !== "local") {
-      const ep = process.env.NEXT_PUBLIC_S3_ENDPOINT || "";
+      const ep = process.env.NEXT_PUBLIC_S3_PUBLIC_URL || process.env.NEXT_PUBLIC_S3_ENDPOINT || "";
       if (!ep || ep.includes("localhost") || ep.includes("127.0.0.1")) {
-        log.warn("NEXT_PUBLIC_S3_ENDPOINT is unset or points to localhost in production; client browsers will fail to load remote media.");
+        log.warn("NEXT_PUBLIC_S3_PUBLIC_URL or NEXT_PUBLIC_S3_ENDPOINT is unset or points to localhost in production; client browsers will fail to load remote media.");
       }
     }
   }

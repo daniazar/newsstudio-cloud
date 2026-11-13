@@ -199,13 +199,11 @@ export class MultiPassPipelineOrchestrator {
               varPaths.push(varResult.imagePath);
             }
             if (varPaths.length > 0) {
-              const { promptSelectWinningVariant } = await import("../../../../../scripts/image-cli/wizard/redoWizard");
-              const chosenIdx = await promptSelectWinningVariant(varPaths, varSeeds);
-              const winningPath = varPaths[chosenIdx] || varPaths[0];
-
+              // Headless pipeline mode: select the first generated candidate automatically
+              const winningPath = varPaths[0];
               results[results.length - 1].imagePath = winningPath;
               context.currentInputImagePath = winningPath;
-              log.info(`🏆 Locked winning candidate for stage [${stageConfig.stageName}]: ${path.basename(winningPath)}`);
+              log.info(`🏆 Locked winning candidate for stage [${stageConfig.stageName}] (seed ${varSeeds[0] ?? baseSeed}): ${path.basename(winningPath)}`);
             }
           }
         }

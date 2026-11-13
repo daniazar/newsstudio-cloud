@@ -41,6 +41,12 @@ export async function POST(req: Request) {
     }
 
     const ttsServerUrl = process.env.MODERN_TTS_SERVER_URL || 'http://localhost:8005'
+    if (process.env.NODE_ENV === 'production' && (ttsServerUrl.includes('localhost') || ttsServerUrl.includes('127.0.0.1'))) {
+      return NextResponse.json(
+        { error: 'Direct localhost voice dubbing matrix is disabled in production. Use the local worker queue.', remoteWorkerRequired: true },
+        { status: 503 }
+      )
+    }
     const tracks = await Promise.all(
       targetLanguages.map(async (langKey: string) => {
         const meta = LANGUAGE_METADATA[langKey] || {

@@ -1,4 +1,4 @@
-import { spawn, exec, execFile } from "child_process";
+import { spawn, execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
@@ -14,7 +14,6 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("worker:render-task");
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 export type ProgressCallback = (data: { step: string; status: string; doneSteps?: number; creditsUsed?: number }) => Promise<boolean>;

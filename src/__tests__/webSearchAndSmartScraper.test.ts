@@ -32,7 +32,7 @@ import {
 } from "@/lib/tenant/credentials";
 import {
   maskAdminSettings,
-} from "@/app/api/admin/settings/route";
+} from "@/lib/admin/settingsMask";
 import { createLogger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 

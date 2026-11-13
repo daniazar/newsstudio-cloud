@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ProductSpec } from "@/lib/types/ecommerce";
 import { useToast } from "@/components/global/ToastContainer";
+import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
 
 export interface VeoProductModalProps {
   isOpen: boolean;
@@ -91,6 +92,29 @@ export const VeoProductModal: React.FC<VeoProductModalProps> = ({
       });
 
       const data = await res.json();
+      if (data.queued && data.jobId) {
+        void pingLocalWorkerWake("veo_generate");
+        toast("Veo Queued", `Queued Veo job ${data.jobId} for local GPU synthesis.`, "info");
+        for (let attempt = 0; attempt < 90; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          const pollRes = await fetch(`/api/ecommerce/veo/generate?jobId=${encodeURIComponent(data.jobId)}`);
+          if (!pollRes.ok) continue;
+          const pollData = await pollRes.json();
+          if (pollData.status === "DONE") {
+            setGenerationOutput({
+              stdout: typeof pollData.result === "string" ? pollData.result : JSON.stringify(pollData.result ?? {}),
+              manifest: pollData.result?.manifest ?? null,
+              manifestPath: pollData.result?.videoUrl ?? pollData.result?.manifestPath ?? null,
+            });
+            toast("Generation Completed", "Veo product scene generated successfully.", "success");
+            return;
+          }
+          if (pollData.status === "FAILED" || pollData.status === "CANCELLED") {
+            throw new Error(pollData.error || "Queued Veo job failed");
+          }
+        }
+        throw new Error("Timed out waiting for Veo job completion");
+      }
       if (data.success) {
         setGenerationOutput({
           stdout: data.stdout,

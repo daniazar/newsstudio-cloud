@@ -52,3 +52,8 @@ yarn-error.log*
 .DS_Store
 *.pem
 Thumbs.db
+
+# Local agent scratch & test artifacts
+.gemini/
+/renders/
+/scratch/

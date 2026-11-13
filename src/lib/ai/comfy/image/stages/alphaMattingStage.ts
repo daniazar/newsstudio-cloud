@@ -50,7 +50,7 @@ export class AlphaMattingStage implements PipelineStage {
       throw new Error(`[Stage 7: Alpha Matting] No input image found from previous stage.`);
     }
 
-    const { makeTransparentPng } = await import("../../../../../../scripts/image-cli/runner");
+    const { makeTransparentPng } = await import("../makeTransparentPng");
 
     log.info(`🔄 [Stage 7: ComfyUI Rembg Neural Isolation] Submitting image to ComfyUI ImageRemoveBackgroundRembg node...`);
 

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { requireWorkerKey } from "@/lib/workerAuth";
 import { commitQuota, rollbackQuota } from "@/lib/quota/quotaEngine";
 import { sendOperationalAlert } from "@/lib/alerting/notifier";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 
 interface RouteParams {
   params: Promise<{ jobId: string }>;
@@ -76,7 +77,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       if (job.startedAt) {
         updateData.durationMs = new Date().getTime() - new Date(job.startedAt).getTime();
       }
-      if (job.type === "render" && result && typeof result === "object") {
+      const persistResultJobTypes = new Set([
+        "render",
+        "ecommerce_photo",
+        "ecommerce_scene",
+        "ecommerce_veo",
+        "ecommerce_lipsync",
+        "ecommerce_render",
+        "persona_studio_image",
+      ]);
+      if (persistResultJobTypes.has(job.type) && result && typeof result === "object") {
         let parsedConfig: Record<string, unknown> = {};
         if (job.config) {
           try {
@@ -139,6 +149,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 config: job.config,
               }
             });
+            void broadcastWorkerWake("job_queued");
           }
           
           if (needsBubble) {
@@ -152,6 +163,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 config: job.config,
               }
             });
+            void broadcastWorkerWake("job_queued");
           }
 
           // If neither is needed (e.g., stock only), we skip straight to render
@@ -166,6 +178,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 config: job.config,
               }
             });
+            void broadcastWorkerWake("job_queued");
           }
         }
       } else if (
@@ -199,6 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               config: job.config,
             }
           });
+          void broadcastWorkerWake("job_queued");
         }
       }
     }

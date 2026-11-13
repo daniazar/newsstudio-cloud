@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useUser } from "@clerk/nextjs";
-import { usePolling } from "@/lib/hooks/usePolling";
+import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
 import { useToast } from "@/components/global/ToastContainer";
 import { 
   BarChart2, Tv, Radio, Clock, ShieldCheck, ShieldAlert,
@@ -125,24 +125,32 @@ export default function AdminDashboardPage() {
   const { isLoaded, isSignedIn } = useUser();
   const { toast } = useToast();
   const isAdmin = isSignedIn;
-  const { enabled: pollingEnabled, interval: pollingInterval } = usePolling();
 
   const { data, mutate, isValidating } = useSWR<DashboardData>(
-    isAdmin ? "/api/admin/dashboard" : null, 
+    isAdmin ? "/api/admin/dashboard" : null,
     fetcher,
-    { refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0 }
+    {
+      refreshInterval: (latestData) => {
+        const queued = latestData?.jobStats?.queued ?? 0;
+        const processing = latestData?.jobStats?.processing ?? 0;
+        return queued + processing > 0 ? 10_000 : 0;
+      },
+      revalidateOnFocus: true,
+    }
   );
 
   const [replayingJobs, setReplayingJobs] = useState<Set<string>>(new Set());
   const [timelineDays, setTimelineDays] = useState<number>(30);
   const [currentTime, setCurrentTime] = useState<number>(0);
 
+  const hasActiveJobs = (data?.activeJobs?.length ?? 0) > 0;
   useEffect(() => {
+    if (!hasActiveJobs) return;
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [hasActiveJobs]);
 
   if (!isLoaded) {
     return (
@@ -182,6 +190,7 @@ export default function AdminDashboardPage() {
       });
       const result = await res.json();
       if (result.success) {
+        void pingLocalWorkerWake("job_replayed");
         toast("Replayed", result.message, "success");
         mutate();
       } else {
@@ -210,7 +219,10 @@ export default function AdminDashboardPage() {
     try {
       if (action === "ingest-all") {
         const res = await fetch("/api/ingest", { method: "POST" });
-        if (res.ok) toast("Triggered", "Feed ingestion has been queued.", "success");
+        if (res.ok) {
+          void pingLocalWorkerWake("ingest");
+          toast("Triggered", "Feed ingestion has been queued.", "success");
+        }
         else toast("Error", "Could not trigger ingestion.", "error");
       } else if (action === "flush-dlq") {
         if (!confirm("Delete all FAILED/DEAD jobs? This cannot be undone.")) return;
@@ -230,6 +242,7 @@ export default function AdminDashboardPage() {
             body: JSON.stringify({ jobId: job.id }),
           });
         }
+        if (failedJobs.length > 0) void pingLocalWorkerWake("rerun_failed");
         toast("Replayed", `${failedJobs.length} failed jobs re-queued.`, "success");
         mutate();
       }

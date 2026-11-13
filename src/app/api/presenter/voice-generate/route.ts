@@ -22,6 +22,12 @@ export async function POST(req: Request) {
     }
 
     const ttsServerUrl = process.env.MODERN_TTS_SERVER_URL || 'http://localhost:8005'
+    if (process.env.NODE_ENV === 'production' && (ttsServerUrl.includes('localhost') || ttsServerUrl.includes('127.0.0.1'))) {
+      return NextResponse.json(
+        { error: 'Direct localhost TTS synthesis is disabled in production. Use the local worker queue.', remoteWorkerRequired: true },
+        { status: 503 }
+      )
+    }
     
     // Default engine resolution if not specified
     const targetEngine = engine || (language.startsWith('es') ? 'f5_tts' : 'xtts_v2')

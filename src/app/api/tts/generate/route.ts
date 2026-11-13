@@ -13,6 +13,18 @@ export async function POST(req: NextRequest) {
   const rl = checkRateLimit(orgId, RateLimitTiers.AI_EXPENSIVE);
   if (!rl.allowed) return rateLimitResponse(rl);
 
+  const ttsUrl = process.env.MODERN_TTS_SERVER_URL || "http://localhost:8005";
+  const isLocalhost = ttsUrl.includes("localhost") || ttsUrl.includes("127.0.0.1");
+  if (process.env.NODE_ENV === "production" && isLocalhost) {
+    return NextResponse.json(
+      {
+        error: "Direct localhost Modern-TTS calls are disabled in production; queue audio generation jobs for the local worker instead.",
+        remoteWorkerRequired: true,
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await req.json();
     const {

@@ -8,10 +8,12 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCw,
   Sliders,
   Sparkles,
 } from "lucide-react";
 import { useToast } from "@/components/global/ToastContainer";
+import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -203,6 +205,7 @@ function QueueJobModal({ onClose, onQueued }: { onClose: () => void; onQueued: (
         return;
       }
 
+      void pingLocalWorkerWake("pipeline_start");
       onQueued();
       onClose();
     } catch {
@@ -328,6 +331,7 @@ function JobDrawer({ job, onClose }: { job: GenerationJob; onClose: () => void }
                 onClick={async () => {
                   if (!confirm(job.status === "DONE" ? "Rerun this job?" : "Retry this job?")) return;
                   await fetch(`/api/pipeline/jobs/${job.id}/retry`, { method: "POST" });
+                  void pingLocalWorkerWake("job_retry");
                   onClose();
                 }}
                 className="text-accent hover:text-accent-hover font-bold transition-colors text-xs uppercase tracking-wide px-2 py-1 bg-accent/10 rounded"
@@ -476,26 +480,49 @@ export default function PipelinePage() {
   const [minJobsRender, setMinJobsRender] = useState<number>(1);
   const [minJobsImage, setMinJobsImage] = useState<number>(1);
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
-  const currentTime = React.useSyncExternalStore(
-    useCallback((cb: () => void) => {
-      const timer = setInterval(cb, 10000);
-      return () => clearInterval(timer);
-    }, []),
-    () => Date.now(),
-    () => 0
-  );
 
   const statusParam = filter === "all" ? "" : `&status=${filter}`;
-  const { data, mutate } = useSWR<JobsResponse>(
+  const { data, mutate, isValidating: isValidatingJobs } = useSWR<JobsResponse>(
     `/api/pipeline/jobs?limit=50${statusParam}`,
     fetcher,
-    { refreshInterval: 3000 }
+    {
+      refreshInterval: (latestData) => {
+        const hasActive = latestData?.data?.some(
+          (j) => j.status !== "DONE" && j.status !== "FAILED" && j.status !== "CANCELLED"
+        );
+        return hasActive ? 5000 : 0;
+      },
+      revalidateOnFocus: true,
+    }
   );
 
-  const { data: pipelineData, mutate: mutatePipeline } = useSWR<PipelineStatsResponse>(
+  const { data: pipelineData, mutate: mutatePipeline, isValidating: isValidatingStats } = useSWR<PipelineStatsResponse>(
     `/api/pipeline/stats`,
     fetcher,
-    { refreshInterval: 3000 }
+    {
+      refreshInterval: (latestData) => {
+        const queued = latestData?.stats?.queued ?? 0;
+        const inProgress = latestData?.stats?.inProgress ?? 0;
+        return queued + inProgress > 0 ? 5000 : 0;
+      },
+      revalidateOnFocus: true,
+    }
+  );
+
+  const hasActivePipelineWork =
+    (pipelineData?.stats?.queued ?? 0) + (pipelineData?.stats?.inProgress ?? 0) > 0;
+
+  const currentTime = React.useSyncExternalStore(
+    useCallback(
+      (cb: () => void) => {
+        if (!hasActivePipelineWork) return () => {};
+        const timer = setInterval(cb, 10000);
+        return () => clearInterval(timer);
+      },
+      [hasActivePipelineWork]
+    ),
+    () => Date.now(),
+    () => 0
   );
 
   // Sync settings when data changes
@@ -579,6 +606,7 @@ export default function PipelinePage() {
   const handleRetry = useCallback(
     async (jobId: string) => {
       await fetch(`/api/pipeline/jobs/${jobId}/retry`, { method: "POST" });
+      void pingLocalWorkerWake("job_retry");
       mutate();
       mutatePipeline();
     },
@@ -659,6 +687,19 @@ export default function PipelinePage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              void mutate();
+              void mutatePipeline();
+            }}
+            disabled={isValidatingJobs || isValidatingStats}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-mono font-bold rounded-xl bg-surface-raised/90 border border-border/80 hover:bg-white/[0.08] text-foreground transition-all cursor-pointer active:scale-95 disabled:opacity-60"
+            title="Refresh pipeline jobs and worker stats"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isValidatingJobs || isValidatingStats ? "animate-spin text-emerald-400" : "text-muted"}`} />
+            <span>Refresh</span>
+          </button>
+
           {/* View Toggle */}
           <div className="flex items-center bg-surface-raised/90 rounded-xl p-0.5 border border-border/80">
             <button

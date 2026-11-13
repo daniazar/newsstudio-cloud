@@ -2,15 +2,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GET } from "../route";
 import { GET as getLive } from "../live/route";
 import { getAggregatedSystemHealth } from "@/lib/health";
-import { prisma } from "@/lib/prisma";
 
 // Mock dependencies
 vi.mock("@/lib/health");
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    $queryRaw: vi.fn(),
-  },
-}));
 
 describe("Health API Endpoint", () => {
   beforeEach(() => {
@@ -129,14 +123,14 @@ describe("Health API Endpoint", () => {
       expect(data.status).toBe("degraded");
     });
 
-    it("should return 500 when health check throws error", async () => {
+    it("should return 200 degraded when health check throws error", async () => {
       vi.mocked(getAggregatedSystemHealth).mockRejectedValue(new Error("Health check failed"));
 
       const response = await GET();
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.status).toBe("unhealthy");
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("degraded");
       expect(data.error).toBeDefined();
     });
 
@@ -176,28 +170,14 @@ describe("Health API Endpoint", () => {
   });
 
   describe("GET /api/health/live", () => {
-    it("should return 200 when database connection is responsive", async () => {
-      vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([{ "?column?": 1 }] as any);
-
+    it("should immediately return 200 ok with Cache-Control headers without querying DB", async () => {
       const response = await getLive();
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data.status).toBe("ok");
-      expect(data.live).toBe(true);
       expect(data.timestamp).toBeDefined();
-    });
-
-    it("should return 503 when database query fails", async () => {
-      vi.mocked(prisma.$queryRaw).mockRejectedValueOnce(new Error("Database connection closed"));
-
-      const response = await getLive();
-      const data = await response.json();
-
-      expect(response.status).toBe(503);
-      expect(data.status).toBe("error");
-      expect(data.live).toBe(false);
-      expect(data.error).toContain("Database connection closed");
+      expect(response.headers.get("Cache-Control")).toBe("no-store, no-cache, must-revalidate");
     });
   });
 });

@@ -106,34 +106,28 @@ describe("Storage Abstraction Layer", () => {
   });
 
   describe("Storage Client Selection", () => {
-    it("should select Azure client when STORAGE_PROVIDER is azure", () => {
-      (env as any).STORAGE_PROVIDER = "azure";
-
-      // The actual client instantiation would be tested in integration tests
-      // Here we're testing that the factory logic works
-      expect(env.STORAGE_PROVIDER).toBe("azure");
+    it("should select R2 client when STORAGE_PROVIDER is r2", () => {
+      (env as any).STORAGE_PROVIDER = "r2";
+      expect(env.STORAGE_PROVIDER).toBe("r2");
     });
 
     it("should select MinIO client when STORAGE_PROVIDER is minio", () => {
       (env as any).STORAGE_PROVIDER = "minio";
-
       expect(env.STORAGE_PROVIDER).toBe("minio");
     });
 
     it("should select Local client when STORAGE_PROVIDER is local", () => {
       (env as any).STORAGE_PROVIDER = "local";
-
       expect(env.STORAGE_PROVIDER).toBe("local");
     });
 
     it("should default to Local client when STORAGE_PROVIDER is not set", () => {
       (env as any).STORAGE_PROVIDER = undefined;
-
       expect(env.STORAGE_PROVIDER).toBeUndefined();
     });
   });
 
-  describe("LocalStorageClient listing", () => {
+  describe("LocalStorageClient listing & presigned URLs", () => {
     it("should return an empty array for non-existent prefix directory", async () => {
       const { LocalStorageClient } = await import("../local");
       const client = new LocalStorageClient();
@@ -141,48 +135,66 @@ describe("Storage Abstraction Layer", () => {
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(0);
     });
+
+    it("should return local url path for presigned upload and read URLs", async () => {
+      const { LocalStorageClient } = await import("../local");
+      const client = new LocalStorageClient();
+      const uploadUrl = await client.getPresignedUploadUrl("test-audio.wav", "audio/wav");
+      const readUrl = await client.getPresignedReadUrl("test-audio.wav");
+
+      expect(uploadUrl).toBe("/assets/test-audio.wav");
+      expect(readUrl).toBe("/assets/test-audio.wav");
+    });
   });
 
-  describe("AzureStorageClient getSignedUrl", () => {
-    it("should generate a URL with SAS query parameters when AZURE_STORAGE_KEY is provided", async () => {
-      const origKey = process.env.AZURE_STORAGE_KEY;
-      const origAccount = process.env.AZURE_STORAGE_ACCOUNT;
+  describe("MinioStorageClient & Cloudflare R2", () => {
+    it("should format R2 public URL directly mapping to bucket root without bucket suffix", async () => {
+      const origPublic = process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
       try {
-        process.env.AZURE_STORAGE_KEY = Buffer.from("mock_fake_azure_storage_key_32bytes!").toString("base64");
-        process.env.AZURE_STORAGE_ACCOUNT = "testaccount";
+        process.env.NEXT_PUBLIC_S3_PUBLIC_URL = "https://pub-abcdef123456.r2.dev";
+        const { MinioStorageClient } = await import("../minio");
+        const client = new MinioStorageClient();
+        const url = client.getUrl("avatars/ruby.png");
 
-        const { AzureStorageClient } = await import("../azure");
-        const client = new AzureStorageClient();
-        const signedUrl = await client.getSignedUrl("renders/video123.mp4", 1800);
-
-        expect(signedUrl).toContain("https://testaccount.blob.core.windows.net/renders/renders/video123.mp4");
-        expect(signedUrl).toContain("sp=r");
-        expect(signedUrl).toContain("sig=");
+        expect(url).toBe("https://pub-abcdef123456.r2.dev/avatars/ruby.png");
+        expect(url).not.toContain("news-studio");
       } finally {
-        if (origKey !== undefined) process.env.AZURE_STORAGE_KEY = origKey;
-        else delete process.env.AZURE_STORAGE_KEY;
-        if (origAccount !== undefined) process.env.AZURE_STORAGE_ACCOUNT = origAccount;
-        else delete process.env.AZURE_STORAGE_ACCOUNT;
+        if (origPublic !== undefined) process.env.NEXT_PUBLIC_S3_PUBLIC_URL = origPublic;
+        else delete process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
       }
     });
 
-    it("should fallback to unsigned URL when no credentials are configured", async () => {
-      const origKey = process.env.AZURE_STORAGE_KEY;
-      const origConn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    it("should format standard S3/MinIO URL with bucket suffix when NEXT_PUBLIC_S3_PUBLIC_URL is unset", async () => {
+      const origPublic = process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
+      const origEndpoint = process.env.S3_ENDPOINT;
       try {
-        delete process.env.AZURE_STORAGE_KEY;
-        delete process.env.AZURE_STORAGE_CONNECTION_STRING;
+        delete process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
+        delete process.env.NEXT_PUBLIC_S3_ENDPOINT;
+        process.env.S3_ENDPOINT = "http://localhost:9000";
+        process.env.S3_BUCKET_NAME = "news-studio";
 
-        const { AzureStorageClient } = await import("../azure");
-        const client = new AzureStorageClient();
-        const signedUrl = await client.getSignedUrl("renders/video123.mp4", 1800);
+        const { MinioStorageClient } = await import("../minio");
+        const client = new MinioStorageClient();
+        const url = client.getUrl("audio/segment.wav");
 
-        expect(signedUrl).not.toContain("sig=");
-        expect(signedUrl).toContain("renders/video123.mp4");
+        expect(url).toBe("http://localhost:9000/news-studio/audio/segment.wav");
       } finally {
-        if (origKey) process.env.AZURE_STORAGE_KEY = origKey;
-        if (origConn) process.env.AZURE_STORAGE_CONNECTION_STRING = origConn;
+        if (origPublic !== undefined) process.env.NEXT_PUBLIC_S3_PUBLIC_URL = origPublic;
+        if (origEndpoint !== undefined) process.env.S3_ENDPOINT = origEndpoint;
       }
+    });
+
+    it("should generate presigned upload and read URLs", async () => {
+      const { MinioStorageClient } = await import("../minio");
+      const client = new MinioStorageClient();
+
+      const uploadUrl = await client.getPresignedUploadUrl("tenants/org_1/renders/video.mp4", "video/mp4", 900);
+      const readUrl = await client.getPresignedReadUrl("tenants/org_1/renders/video.mp4", 900);
+
+      expect(uploadUrl).toContain("tenants/org_1/renders/video.mp4");
+      expect(uploadUrl).toContain("X-Amz-Signature");
+      expect(readUrl).toContain("tenants/org_1/renders/video.mp4");
+      expect(readUrl).toContain("X-Amz-Signature");
     });
   });
 });

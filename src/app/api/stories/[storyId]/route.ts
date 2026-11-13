@@ -1,42 +1,24 @@
-import { inngest } from "@/inngest/client";
 import { verifySegmentFact } from "@/lib/ai/factChecker";
 import { expandAcronyms } from "@/lib/ai/pronunciationDetector";
 import { translateNewsScript,type TargetLanguage } from "@/lib/ai/translator";
 import { generateScript,normalizeTextForAudio } from "@/lib/llm/client";
 import { polishTextWithOllama } from "@/lib/llm/providers/ollama";
-import { generateOrFallbackMusic } from "@/lib/music";
-import { finishJobProgress,startJobProgress,updateJobProgress } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { scrapeArticle } from "@/lib/scraper/articleScraper";
-import { downloadExternalAssetToStorage,downloadToStorage,searchStock } from "@/lib/stock";
+import { searchStock } from "@/lib/stock";
 import { requireTenant } from "@/lib/tenant";
 import { StoryStatus,VideoStatus } from "@/lib/types";
 import { type ChildProcess } from "child_process";
 import { NextRequest,NextResponse } from "next/server";
 import { z } from "zod";
 
-import { withTenant } from "@/lib/storage";
+import { dispatchGenerateScript } from "@/lib/orchestration/dispatch";
+import { broadcastWorkerWake } from "@/lib/worker-broker";
 import { deleteSegmentStorageAssets,deleteStoryStorageAssets } from "@/lib/storage/cleanup";
 import { planNewsBroadcastFsmSequence } from "@/lib/video/loopSelector";
 
 // Track active render processes so we can cancel them
 const activeRenders = new Map<string, ChildProcess>();
-
-/**
- * Helper: try Inngest, fall back to direct execution.
- */
-async function trySendInngest(
-  eventName: string,
-  data: Record<string, unknown>
-): Promise<boolean> {
-  try {
-    await inngest.send({ name: eventName, data });
-    return true;
-  } catch {
-    console.warn(`[API] Inngest unavailable for ${eventName}, running directly`);
-    return false;
-  }
-}
 
 /**
  * GET /api/stories/[storyId] — Get a single story with all relations.
@@ -388,398 +370,12 @@ export async function POST(
         }
       }
 
-        const sentToInngest = await trySendInngest("news/generate-script", {
+        void dispatchGenerateScript({
           storyId,
           companyId: orgId,
+        }).catch((err) => {
+          console.error(`[Newsroom] [${storyId}] Async script generation failed:`, err);
         });
-
-        if (!sentToInngest) {
-          console.warn(`[Newsroom] Inngest offline. Starting direct script generation for: ${story.title}`);
-
-          // Fire-and-forget background task
-          (async () => {
-            // Create Notification job to track progress
-            const progressId = await startJobProgress(
-              "Script Generation",
-              `Starting script generation for ${story.title.substring(0, 30)}...`,
-              7,
-              orgId,
-              storyId
-            );
-
-            try {
-              // Step 1: Status -> SCRIPTING
-              await prisma.story.update({
-                where: { id: storyId },
-                data: { status: StoryStatus.SCRIPTING },
-              });
-
-              // Step 2: Scrape article
-              await updateJobProgress(progressId, 1, "Scraping full article content...");
-              const scrapeResult = await scrapeArticle(
-                story.link,
-                story.description ?? undefined
-              );
-
-              if (scrapeResult.article?.content) {
-                await prisma.story.update({
-                  where: { id: storyId },
-                  data: { 
-                    fullContent: scrapeResult.article.content,
-                    articleImageUrls: scrapeResult.article.images && scrapeResult.article.images.length > 0 ? JSON.stringify(scrapeResult.article.images) : null,
-                  },
-                });
-              }
-
-              // Step 3: Generate script via LLM
-              await updateJobProgress(progressId, 2, "Generating AI script and segments...");
-              const articleContent =
-                scrapeResult.article?.content ??
-                story.description ??
-                story.title;
-
-              // Load active personas from database to provide style guidelines context to LLM
-              const activePersonas = await prisma.persona.findMany({
-                where: { isActive: true },
-              });
-              const personasContext = activePersonas
-                .map((p) => {
-                  return `Persona Slug: "${p.slug}"
-- Name: ${p.name}
-- Role: ${p.role}
-- Description: ${p.description ?? ""}
-- Visual Description: ${p.visualPrompt ?? ""}
-- Visual/Style Guidelines (Attire/Hair/Makeup/Grooming): ${p.styleGuidelines ?? ""}`;
-                })
-                .join("\n\n");
-
-              const scriptOutput = await generateScript({
-                title: story.title,
-                content: articleContent,
-                author: story.author ?? undefined,
-                source: story.feed.name,
-                images: scrapeResult.article?.images,
-              }, {
-                personasContext,
-                companyId: orgId,
-                engine: "omni",
-              });
-
-              // Delete any existing script to avoid unique constraint failure on retry
-              await prisma.script.deleteMany({
-                where: { storyId },
-              });
-
-              // Step 4: Store in DB
-              await updateJobProgress(progressId, 3, "Saving generated script to database...");
-              const scrapedImages = (scrapeResult.article?.images && scrapeResult.article.images.length > 0)
-                ? scrapeResult.article.images
-                : [];
-
-              const asyncPersona = scriptOutput.segments[0]?.suggested_persona_id || "ruby";
-              const plannedFsmBeats = planNewsBroadcastFsmSequence(scriptOutput.segments, asyncPersona);
-
-              const savedScript = await prisma.script.create({
-                data: {
-                  storyId,
-                  rawJson: JSON.stringify(scriptOutput),
-                  headline: scriptOutput.headline,
-                  segments: {
-                    create: scriptOutput.segments.map((seg, idx) => {
-                      let assetPath: string | null = null;
-                      let assetType: string = "placeholder";
-
-                      if (seg.index === 0) {
-                        // Scene 1: Studio background with Chroma-keyed Anchor loop
-                        assetPath = "/studio_environments/studio_plate_standup_skyline_9x16.jpg";
-                        assetType = "image";
-                      } else if (seg.index === 1) {
-                        // Scene 2: Main article image (image 0)
-                        if (scrapedImages.length > 0) {
-                          assetPath = scrapedImages[0];
-                          assetType = "image";
-                        } else if (seg.source_media_url) {
-                          assetPath = seg.source_media_url;
-                          assetType = "image";
-                        }
-                      } else {
-                        // Scene 3+: Subsequent article images or placeholder for stock B-roll auto-fetch
-                        const articleImgIdx = seg.index - 1;
-                        if (scrapedImages.length > articleImgIdx) {
-                          assetPath = scrapedImages[articleImgIdx];
-                          assetType = "image";
-                        } else if (seg.source_media_url && !scrapedImages.includes(seg.source_media_url)) {
-                          assetPath = seg.source_media_url;
-                          assetType = "image";
-                        }
-                      }
-
-                      const beat = plannedFsmBeats[idx] || plannedFsmBeats.find((b) => b.index === seg.index);
-                      const actionLoop = beat?.clipId || "M1_loop_v1";
-                      const cameraCue = beat?.cameraCue || "cam1_wide";
-                      const loopVideoUrl = beat?.videoUrl || null;
-                      const sceneStrategy = "chroma_broll";
-
-                      const mediaSettings = JSON.stringify({
-                        scale: 1,
-                        offsetX: 0,
-                        offsetY: 0,
-                        startTrim: 0,
-                        endTrim: 0,
-                        transitionType: "fade",
-                        sceneStrategy,
-                        actionLoop,
-                        cameraCue,
-                        startPose: beat?.startPose || "M1",
-                        endPose: beat?.endPose || "M1",
-                        actionStateLabel: beat?.actionStateLabel || "M1 Anchor Stance",
-                        videoUrl: loopVideoUrl,
-                        presenterVideoPath: loopVideoUrl,
-                        layoutMode: "full_screen",
-                      });
-
-                      const effectiveSegPersona = seg.suggested_persona_id || asyncPersona;
-
-                      return {
-                        index: seg.index,
-                        startTime: seg.start_time,
-                        endTime: seg.end_time,
-                        text: seg.text,
-                        spokenText: seg.spoken_text || null,
-                        imagePrompt: seg.image_prompt,
-                        assetPath,
-                        assetType,
-                        sceneStrategy,
-                        mediaSettings,
-                        suggestedPersonaId: effectiveSegPersona,
-                        personaId: effectiveSegPersona,
-                        presenterVideoPath: loopVideoUrl,
-                        keyword: seg.keyword ?? null,
-                        presetChoice: seg.preset_choice ?? null,
-                        personaImagePrompt: seg.persona_image_prompt ?? null,
-                        presenterVideoPrompt: seg.presenter_video_prompt ?? null,
-                      };
-                    }),
-                  },
-                },
-                include: { segments: true },
-              });
-
-              // Step 5: Create video record
-              await updateJobProgress(progressId, 4, "Finalizing pipeline and creating video metadata...");
-              const videoRecord = await prisma.video.upsert({
-                where: { storyId },
-                create: {
-                  companyId: orgId,
-                  storyId,
-                  status: "PENDING",
-                  youtubeTitle: scriptOutput.youtube_title,
-                  youtubeDescription: scriptOutput.youtube_description,
-                  youtubeTags: scriptOutput.youtube_tags
-                    ? JSON.stringify(scriptOutput.youtube_tags)
-                    : null,
-                  instagramCaption: scriptOutput.instagram_caption,
-                  instagramHashtags: scriptOutput.instagram_hashtags
-                    ? JSON.stringify(scriptOutput.instagram_hashtags)
-                    : null,
-                },
-                update: {
-                  youtubeTitle: scriptOutput.youtube_title,
-                  youtubeDescription: scriptOutput.youtube_description,
-                }
-              });
-
-              // Step 6a: Download external crawled image assets to S3 to prevent CORS blocks
-              await updateJobProgress(progressId, 5, "Downloading crawled article images to storage...");
-              const externalImageSegments = savedScript.segments.filter(
-                (seg) => seg.assetPath && seg.assetPath.startsWith("http")
-              );
-              if (externalImageSegments.length > 0) {
-                await Promise.all(
-                  externalImageSegments.map(async (seg) => {
-                    try {
-                      const ext = seg.assetPath!.includes(".png") ? "png" : "jpg";
-                      const storageKey = withTenant(orgId, `broll/story-${storyId}/seg-${seg.index}.${ext}`);
-                      await downloadExternalAssetToStorage(seg.assetPath!, storageKey);
-
-                      await prisma.segment.update({
-                        where: { id: seg.id },
-                        data: { assetPath: storageKey }
-                      });
-                      seg.assetPath = storageKey; // Update local memory representation as well
-                    } catch (err) {
-                      console.warn(`[StockFetch Direct] Failed to download external crawled asset for scene ${seg.index + 1}:`, err);
-                    }
-                  })
-                );
-              }
-
-              // Step 6: Auto-fetch stock B-roll assets for segments
-              await updateJobProgress(progressId, 5, "Auto-fetching stock B-roll assets for segments...");
-              const segmentsNeedingAssets = savedScript.segments.filter(
-                (seg) => !seg.assetPath && (seg.keyword || seg.imagePrompt)
-              );
-
-              if (segmentsNeedingAssets.length > 0) {
-                await Promise.all(
-                  segmentsNeedingAssets.map(async (seg) => {
-                    try {
-                      const minDuration = Math.ceil(seg.endTime - seg.startTime);
-                      const scriptSeg = scriptOutput.segments.find((s) => s.index === seg.index);
-                      const searchQueries = [
-                        seg.keyword || seg.imagePrompt || "news background",
-                        ...(scriptSeg?.backup_keywords ?? []),
-                      ].filter(Boolean) as string[];
-
-                      let stockResults: Awaited<ReturnType<typeof searchStock>> = [];
-                      let usedQuery = "";
-
-                      for (const query of searchQueries) {
-                        try {
-                          const results = await searchStock(query, {
-                            type: "video",
-                            minDuration,
-                            perPage: 3,
-                            orientation: "portrait",
-                          });
-                          if (results && results.length > 0) {
-                            stockResults = results;
-                            usedQuery = query;
-                            break;
-                          }
-                        } catch (err) {
-                          console.error(`[StockFetch Direct] Failed search for query "${query}":`, err);
-                        }
-                      }
-
-                      if (stockResults.length > 0) {
-                        const bestMatch = stockResults[0];
-                        const storageKey = await downloadToStorage(
-                          bestMatch,
-                          orgId,
-                          `broll/story-${storyId}/seg-${seg.index}`
-                        );
-
-                        await prisma.segment.update({
-                          where: { id: seg.id },
-                          data: {
-                            assetPath: storageKey,
-                            assetType: bestMatch.type,
-                            stockAssetSource: bestMatch.provider,
-                            stockAssetQuery: usedQuery,
-                          },
-                        });
-                      } else {
-                        console.warn(`[StockFetch Direct] No results matched for segment ${seg.index}`);
-                        await prisma.notification.create({
-                          data: {
-                          companyId: orgId,
-                            type: "system_alert",
-                            title: `B-Roll Asset Search Warning (Scene ${seg.index + 1})`,
-                            message: `No stock video matching "${searchQueries.join(" / ")}" was found. Scene ${seg.index + 1} will render with default fallback gradient.`,
-                          },
-                        });
-                      }
-                    } catch (error) {
-                      console.error(`[StockFetch Direct] Error fetching for segment ${seg.index}:`, error);
-                      await prisma.notification.create({
-                        data: {
-                          companyId: orgId,
-                          type: "system_alert",
-                          title: `B-Roll Asset Download Error (Scene ${seg.index + 1})`,
-                          message: `Could not fetch stock B-roll for scene ${seg.index + 1}: ${error instanceof Error ? error.message : String(error)}.`,
-                        },
-                      });
-                    }
-                  })
-                );
-              }
-
-              // Step 7: Auto-select background music
-              await updateJobProgress(progressId, 6, "Selecting automated background music...");
-              const mood = scriptOutput.suggested_music_mood;
-              const query = scriptOutput.suggested_music_query;
-
-              if (mood || query) {
-                try {
-                  const musicPrompt = query || (mood ? `${mood} broadcast news bed` : "broadcast news theme");
-
-                  const musicResult = await generateOrFallbackMusic(
-                    {
-                      prompt: musicPrompt,
-                      mood: mood || "serious",
-                      duration: 45,
-                      instrumental: true,
-                    },
-                    orgId
-                  );
-
-                  if (musicResult && musicResult.storageKey) {
-                    await prisma.video.update({
-                      where: { id: videoRecord.id },
-                      data: {
-                        bgMusicId: musicResult.id,
-                        bgMusicPath: musicResult.storageKey
-                      },
-                    });
-                  } else {
-                    console.warn("[Music Direct] No tracks generated or found");
-                  }
-                } catch (e) {
-                  console.warn("[Music Direct] Auto-selection failed:", e);
-                  const attemptedProviders = process.env.MUSIC_PROVIDER_PRIORITY || "pixabay-music, jamendo-music";
-                  await prisma.notification.create({
-                    data: {
-                      companyId: orgId,
-                      type: "system_alert",
-                      title: "Music Provider Error",
-                      message: `Failed to fetch background music: ${e instanceof Error ? e.message : "Provider returned an error"}. Attempted music providers: [${attemptedProviders}].`,
-                    },
-                  });
-                }
-              }
-
-
-              // Step 8: Status -> SCRIPTED
-              await updateJobProgress(progressId, 7, "Applying final approval gate and script routing...");
-              await prisma.story.update({
-                where: { id: storyId },
-                data: { status: StoryStatus.SCRIPTED },
-              });
-
-              // Finalize generating script progress!
-              await finishJobProgress(
-                progressId,
-                `Script generation and assets pre-fetching complete for "${story.title.substring(0, 30)}..."`,
-                true
-              );
-
-            } catch (err) {
-              const errorMessage = err instanceof Error ? err.message : String(err);
-              console.error(`[Newsroom] [${storyId}] Background task failed:`, errorMessage);
-              await prisma.story.update({
-                where: { id: storyId },
-                data: {
-                  status: StoryStatus.FAILED,
-                  errorLog: errorMessage,
-                },
-              });
-
-              // Mark job progress as failed
-              await finishJobProgress(
-                progressId,
-                `Script generation failed: ${errorMessage.substring(0, 50)}`,
-                false
-              );
-            }
-          })();
-
-          return NextResponse.json({
-            success: true,
-            action: "generate-script",
-            mode: "direct-background",
-          });
-        }
 
         return NextResponse.json({
           success: true,
@@ -835,6 +431,7 @@ export async function POST(
             }),
           }
         });
+        void broadcastWorkerWake("job_queued");
 
         return NextResponse.json({
           success: true,
@@ -897,6 +494,7 @@ export async function POST(
             }),
           },
         });
+        void broadcastWorkerWake("job_queued");
 
         return NextResponse.json({
           success: true,
@@ -1453,7 +1051,16 @@ export async function POST(
       }
 
       case "batch-update-segments": {
-        const segmentsToUpdate = body.segments as Array<any>;
+        interface BatchSegmentUpdate {
+          id?: string;
+          segmentId?: string;
+          text?: string;
+          personaId?: string;
+          mediaSettings?: string;
+          actionLoop?: unknown;
+          cameraCue?: unknown;
+        }
+        const segmentsToUpdate = body.segments as BatchSegmentUpdate[];
 
         if (!segmentsToUpdate || !Array.isArray(segmentsToUpdate)) {
           return NextResponse.json({ error: "Invalid segments data" }, { status: 400 });
@@ -1462,7 +1069,13 @@ export async function POST(
         // Using a transaction to process all segment updates atomically and efficiently
         await prisma.$transaction(
           segmentsToUpdate.map(s => {
-            const data: any = {};
+            const data: {
+              text?: string;
+              personaId?: string;
+              mediaSettings?: string;
+              audioPath?: null;
+              presenterVideoPath?: null;
+            } = {};
             if (s.text !== undefined) data.text = s.text;
             if (s.personaId !== undefined) data.personaId = s.personaId;
             if (s.mediaSettings !== undefined) data.mediaSettings = s.mediaSettings;
@@ -1652,6 +1265,7 @@ export async function POST(
                 }),
               },
             });
+            void broadcastWorkerWake("job_queued");
             return { format: fmt, queued: true, jobId: job.id };
           })
         );

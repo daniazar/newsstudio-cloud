@@ -4,15 +4,13 @@ import { requireTenant } from "@/lib/tenant";
 import { generateLlmObject } from "@/lib/llm/aiSdkGateway";
 import { z } from "zod";
 
-export const BrandAestheticsSchema = z.object({
+const BrandAestheticsSchema = z.object({
   toneOfVoice: z.string().catch("Professional, authoritative, and engaging news broadcast tone"),
   primaryColor: z.string().catch("#10b981"),
   secondaryColor: z.string().catch("#3b82f6"),
   captionStyle: z.string().catch("breaking"),
   preferredMusicMood: z.string().catch("tech"),
 });
-
-export type BrandAesthetics = z.infer<typeof BrandAestheticsSchema>;
 
 export async function POST(
   request: NextRequest,

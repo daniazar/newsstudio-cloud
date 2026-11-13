@@ -115,17 +115,20 @@ export async function POST(req: Request) {
       } catch {}
     }
 
-    // Call modern-tts-server to compute 512-D Super-Embedding tensor (.pt) if online
+    // Call modern-tts-server to compute 512-D Super-Embedding tensor (.pt) if online (skip localhost in prod)
     const ttsServerUrl = process.env.MODERN_TTS_SERVER_URL || 'http://localhost:8005'
-    try {
-      await fetch(`${ttsServerUrl}/api/tts/extract-embedding`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona_id: personaId }),
-        signal: AbortSignal.timeout(3000),
-      })
-    } catch {
-      // Non-blocking embedding extraction
+    const isLocalTts = ttsServerUrl.includes('localhost') || ttsServerUrl.includes('127.0.0.1')
+    if (!(process.env.NODE_ENV === 'production' && isLocalTts)) {
+      try {
+        await fetch(`${ttsServerUrl}/api/tts/extract-embedding`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona_id: personaId }),
+          signal: AbortSignal.timeout(3000),
+        })
+      } catch {
+        // Non-blocking embedding extraction
+      }
     }
 
     // Create or update Persona in database scoped to tenant

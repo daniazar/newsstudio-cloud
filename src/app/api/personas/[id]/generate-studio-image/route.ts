@@ -23,6 +23,56 @@ import fs from "fs";
 import { NextRequest,NextResponse } from "next/server";
 import path from "path";
 import { z } from "zod";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const t = await requireTenant();
+  if (!t.ok) return t.response;
+  const { orgId } = t.tenant;
+  const { id: personaId } = await params;
+
+  const jobId = new URL(request.url).searchParams.get("jobId");
+  if (!jobId) {
+    return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+  }
+
+  const job = await prisma.generationJob.findFirst({
+    where: { id: jobId, companyId: orgId, storyId: personaId },
+  });
+  if (!job) {
+    return NextResponse.json({ error: "Studio image job not found" }, { status: 404 });
+  }
+
+  let parsedConfig: Record<string, unknown> = {};
+  try {
+    parsedConfig = job.config ? (JSON.parse(job.config) as Record<string, unknown>) : {};
+  } catch {}
+  const resultObj =
+    parsedConfig.result && typeof parsedConfig.result === "object"
+      ? (parsedConfig.result as Record<string, unknown>)
+      : {};
+
+  return NextResponse.json({
+    success: job.status === "DONE",
+    jobId: job.id,
+    status: job.status,
+    progress: job.currentStep || (job.status === "QUEUED" ? "Queued for local worker..." : "Generating studio image..."),
+    imageUrl: typeof resultObj.imageUrl === "string" ? resultObj.imageUrl : undefined,
+    storageKey: typeof resultObj.storageKey === "string" ? resultObj.storageKey : undefined,
+    error: job.status === "FAILED" ? job.errorLog || "Studio image generation failed" : undefined,
+  });
+}
 
 const BodySchema = z.object({
   studioType: z.enum([
@@ -97,6 +147,70 @@ export async function POST(
 
   if (!persona) {
     return NextResponse.json({ error: "Persona not found" }, { status: 404 });
+  }
+
+  if (isRemoteWorkerMode()) {
+    const presetName = body.presetOverride
+      ? (STUDIO_FULL_PRESETS.find(p =>
+          p.name.toLowerCase().replace(/\s+/g, "-") === body.presetOverride?.toLowerCase()
+        )?.name || STUDIO_PRESET_MAP[body.studioType as StudioType])
+      : STUDIO_PRESET_MAP[body.studioType as StudioType];
+
+    const preset = STUDIO_FULL_PRESETS.find(p => p.name === presetName);
+    if (!preset) {
+      return NextResponse.json({ error: `Preset "${presetName}" not found` }, { status: 422 });
+    }
+
+    const attire = body.attireOverride || getRandomStudioAttire();
+    const personaDescription = persona.visualPrompt || getPresenterDescription(persona.slug);
+
+    const { positivePrompt } = compilePresenterPrompt({
+      personaDescription,
+      preset,
+      attire,
+      visualBodyPrompt: persona.visualBodyPrompt || undefined,
+      enableDuplicateStripping: true,
+      enableQualityBoilerplate: true,
+      studioApprovedOnly: true,
+      fullAttireOnly: true,
+    });
+
+    const job = await prisma.generationJob.create({
+      data: {
+        companyId: orgId,
+        storyId: persona.id,
+        type: "persona_studio_image",
+        status: "QUEUED",
+        totalSteps: 2,
+        doneSteps: 0,
+        currentStep: "Queued for local worker",
+        config: JSON.stringify({
+          personaId: persona.id,
+          personaSlug: persona.slug,
+          studioType: body.studioType,
+          presetName,
+          attire,
+          positivePrompt,
+          width: 1024,
+          height: 576,
+          denoise: 0.85,
+        }),
+      },
+    });
+    void broadcastWorkerWake("job_queued");
+
+    return NextResponse.json({
+      ok: true,
+      queued: true,
+      success: true,
+      jobId: job.id,
+      status: "QUEUED",
+      personaId: persona.id,
+      personaSlug: persona.slug,
+      studioType: body.studioType,
+      presetUsed: presetName,
+      attireUsed: attire,
+    });
   }
 
   // Check ComfyUI health before starting

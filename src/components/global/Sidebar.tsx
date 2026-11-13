@@ -20,7 +20,6 @@ import {
   Tv,
   Rss,
   FolderOpen,
-  Sparkles,
   Activity,
   LayoutDashboard,
   Building2,
@@ -35,7 +34,6 @@ import {
   Menu,
   X,
   ShoppingBag,
-  FileText,
   Box,
 } from "lucide-react";
 import { NotificationDropdown } from "./NotificationDropdown";
@@ -122,18 +120,21 @@ export const Sidebar = React.memo(function Sidebar() {
 
   const {
     enabled: pollingEnabled,
-    interval: pollingInterval,
     updateSettings: updatePollingSettings,
     isOverridden: pollingOverridden,
   } = usePolling();
 
-  // Poll system health
-  const { data: health } = useSWR("/api/health", fetcher, {
-    refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
-    revalidateOnFocus: false,
-  });
+  // Poll system health only in local non-production mode (0 idle polling in prod)
+  const { data: health } = useSWR(
+    process.env.NODE_ENV === "production" ? null : "/api/health",
+    fetcher,
+    {
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+    },
+  );
 
-  // Fetch notifications
+  // Fetch notifications on mount / focus (no idle polling)
   const { data: notifications } = useSWR<
     | Array<{ isRead: boolean }>
     | {
@@ -141,17 +142,17 @@ export const Sidebar = React.memo(function Sidebar() {
         notifications?: Array<{ isRead: boolean }>;
       }
   >("/api/notifications", fetcher, {
-    refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
-    revalidateOnFocus: false,
+    refreshInterval: 0,
+    revalidateOnFocus: true,
   });
 
-  // Pending access-request count
+  // Pending access-request count (no idle polling)
   const { data: accessReqs } = useSWR<{ stats?: { pendingCount: number } }>(
     isSuperAdmin ? "/api/admin/access-requests" : null,
     fetcher,
     {
-      refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
-      revalidateOnFocus: false,
+      refreshInterval: 0,
+      revalidateOnFocus: true,
     },
   );
   const pendingAccessCount = accessReqs?.stats?.pendingCount ?? 0;

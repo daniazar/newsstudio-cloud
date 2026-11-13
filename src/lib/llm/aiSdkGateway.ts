@@ -31,6 +31,12 @@ import { z } from "zod";
 import type { LLMProvider } from "@/lib/types";
 import { trackLlmUsage } from "@/lib/llm/tokenTracker";
 import { createLogger } from "@/lib/logger";
+import {
+  broadcastWorkerWake,
+  enqueueLlmTask,
+  runLocalLlm,
+  type LlmBrokerResult,
+} from "@/lib/worker-broker";
 
 const log = createLogger({ module: "aiSdkGateway" });
 import {
@@ -831,6 +837,122 @@ export async function resolveLanguageModelAsync(options: ResolveModelOptions): P
   return resolveLanguageModel(options);
 }
 
+function extractPlainPromptFromParams(params: {
+  prompt?: string;
+  messages?: Parameters<typeof generateText>[0]["messages"];
+}): string | null {
+  if (typeof params.prompt === "string" && params.prompt.trim().length > 0) {
+    return params.prompt;
+  }
+  if (!params.messages || params.messages.length === 0) {
+    return null;
+  }
+
+  const lines: string[] = [];
+  for (const msg of params.messages) {
+    if (typeof msg.content === "string") {
+      lines.push(`[${msg.role.toUpperCase()}]\n${msg.content}`);
+    } else if (Array.isArray(msg.content)) {
+      const textParts: string[] = [];
+      for (const part of msg.content) {
+        if (part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part) {
+          textParts.push(String(part.text));
+        } else {
+          // Multimodal (image/file) payloads cannot run through plain agy text CLI
+          return null;
+        }
+      }
+      if (textParts.length > 0) {
+        lines.push(`[${msg.role.toUpperCase()}]\n${textParts.join("\n")}`);
+      }
+    } else {
+      return null;
+    }
+  }
+
+  const joined = lines.join("\n\n").trim();
+  return joined.length > 0 ? joined : null;
+}
+
+async function tryLocalWorkerOrBrokerLlm(params: {
+  prompt?: string;
+  messages?: Parameters<typeof generateText>[0]["messages"];
+  system?: string;
+  schema?: Record<string, unknown>;
+} & LlmCallOptions): Promise<LlmBrokerResult | null> {
+  if (process.env.VITEST === "true" && process.env.LLM_BROKER_FORCE_IN_TEST !== "true") {
+    return null;
+  }
+  if (params.customModel) {
+    return null;
+  }
+  if (params.tools && Object.keys(params.tools).length > 0) {
+    return null;
+  }
+  if (params.provider === "openai-compatible") {
+    return null;
+  }
+
+  const promptText = extractPlainPromptFromParams(params);
+  if (!promptText) {
+    return null;
+  }
+
+  const isWorker = process.env.IS_PIPELINE_WORKER === "true";
+  const allowBroker = process.env.LLM_LOCAL_WORKER_FIRST !== "false";
+
+  if (!isWorker && !allowBroker) {
+    return null;
+  }
+
+  try {
+    let localRes: LlmBrokerResult;
+    if (isWorker) {
+      localRes = await runLocalLlm({
+        prompt: promptText,
+        systemPrompt: params.system,
+        schema: params.schema,
+        model: params.model,
+      });
+    } else {
+      const handle = enqueueLlmTask({
+        prompt: promptText,
+        systemPrompt: params.system,
+        schema: params.schema,
+        model: params.model,
+      });
+      void broadcastWorkerWake("llm_task");
+      localRes = await handle.wait();
+    }
+
+    const inputTokens = localRes.inputTokens ?? 0;
+    const outputTokens = localRes.outputTokens ?? 0;
+    await trackLlmUsage({
+      provider: localRes.engine,
+      model: localRes.model,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      companyId: params.companyId,
+      storyId: params.storyId,
+      estimatedCost: 0.0,
+    }).catch(() => {});
+
+    return localRes;
+  } catch (err) {
+    log.info(
+      {
+        task: isWorker ? "localLlmWorker" : "llmBroker",
+        companyId: params.companyId,
+        storyId: params.storyId,
+        err: err instanceof Error ? err.message : String(err),
+      },
+      "Local/worker LLM unavailable or failed; falling back to cloud provider"
+    );
+    return null;
+  }
+}
+
 /**
  * High-level unified text generation with automatic Gemini <-> Ollama failover.
  */
@@ -844,11 +966,21 @@ export async function generateLlmText(
   text: string;
   reasoning?: string;
   usage?: LanguageModelUsage;
-  providerUsed: LLMProvider;
+  providerUsed: LLMProvider | "agy";
   modelUsed: string;
   stepsCount?: number;
   toolNamesUsed?: string[];
 }> {
+  const localResult = await tryLocalWorkerOrBrokerLlm(params);
+  if (localResult) {
+    const cleaned = localResult.text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    return {
+      text: cleaned,
+      providerUsed: localResult.engine,
+      modelUsed: localResult.model,
+    };
+  }
+
   await getSystemSettings().catch(() => null);
 
   let byokCreds: TenantByokCredentials | null = null;
@@ -999,11 +1131,71 @@ export async function generateLlmObject<TSchema extends z.ZodTypeAny>(
 ): Promise<{
   object: z.infer<TSchema>;
   usage?: LanguageModelUsage;
-  providerUsed: LLMProvider;
+  providerUsed: LLMProvider | "agy";
   modelUsed: string;
   stepsCount?: number;
   toolNamesUsed?: string[];
 }> {
+  const isNoSchema = params.output === "no-schema";
+  let jsonSchema: Record<string, unknown> | undefined;
+  if (!isNoSchema) {
+    try {
+      const converted = z.toJSONSchema(params.schema, { unrepresentable: "any" }) as Record<
+        string,
+        unknown
+      >;
+      if (converted.type === "array" || params.output === "array") {
+        jsonSchema = {
+          type: "object",
+          properties: { elements: converted },
+          required: ["elements"],
+          additionalProperties: false,
+        };
+      } else {
+        jsonSchema = converted;
+      }
+    } catch {
+      jsonSchema = undefined;
+    }
+  }
+
+  const localResult = await tryLocalWorkerOrBrokerLlm({
+    ...params,
+    schema: jsonSchema,
+  });
+
+  if (localResult) {
+    try {
+      const cleaned = cleanJsonText(localResult.text);
+      const parsed = JSON.parse(cleaned);
+      const unwrapped =
+        (params.schema instanceof z.ZodArray || params.output === "array") &&
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "elements" in parsed
+          ? (parsed as { elements: unknown }).elements
+          : parsed;
+      const validated = isNoSchema ? unwrapped : (params.schema.parse(unwrapped) as z.infer<TSchema>);
+      return {
+        object: validated as z.infer<TSchema>,
+        providerUsed: localResult.engine,
+        modelUsed: localResult.model,
+      };
+    } catch (parseErr) {
+      log.warn(
+        {
+          task: "generateLlmObjectLocalParse",
+          engine: localResult.engine,
+          companyId: params.companyId,
+          storyId: params.storyId,
+          err: parseErr instanceof Error ? parseErr.message : String(parseErr),
+        },
+        "Local LLM JSON failed schema validation; falling back to cloud provider"
+      );
+    }
+  }
+
   await getSystemSettings().catch(() => null);
 
   if (!params.tier && !params.model) {

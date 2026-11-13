@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { computeInteractionIntensity, selectPipelineMode } from "../interactionDetector";
-import { createDefaultMultiPassConfig } from "../../../../../../scripts/image-cli/runner";
-import { CliRunConfig } from "../../../../../../scripts/image-cli/types";
 
 describe("Scene Contact Intensity Scoring & Mode Selection Unit Tests (Tasks CC-1, CC-2, CC-3)", () => {
   it("should calculate exact interaction intensity scores per contact tier", () => {
@@ -25,26 +23,5 @@ describe("Scene Contact Intensity Scoring & Mode Selection Unit Tests (Tasks CC-
     expect(selectPipelineMode(55)).toBe("SIMULTANEOUS");
     expect(selectPipelineMode(30)).toBe("HYBRID");
     expect(selectPipelineMode(5)).toBe("SEQUENTIAL");
-  });
-
-  it("should calculate interactionIntensityScore automatically in createDefaultMultiPassConfig", () => {
-    const config: CliRunConfig = {
-      personaKey: "RUBY",
-      variantKey: "BODY_UNCENSORED",
-      modelChoice: "z_image",
-      unetName: "z_image_turbo_bf16.safetensors",
-      width: 1024,
-      height: 1024,
-      sampleCount: 1,
-      activeLoras: [],
-      promptText: "ruby and storm in missionary position intercourse",
-      sceneModifiers: "missionary position intercourse",
-      negativePromptText: "",
-      faceReferenceAbsPath: "",
-      referenceImageAbsPath: ""
-    };
-
-    const mpConfig = createDefaultMultiPassConfig(config, 12345);
-    expect(mpConfig.interactionIntensityScore).toBe(85);
   });
 });

@@ -1,6 +1,9 @@
 node_modules
 .next
 .git
+.env
+.env.local
+.env*.local
 dev.db
 *.sqlite
 *.sqlite-journal
@@ -10,44 +13,27 @@ dev.db
 *.zip
 storage/cache/
 antigravity_conversations*
+*.tsbuildinfo
 
-# Ignore model weights and caches to prevent massive Docker build context
-vendor/ComfyUI/models/
-vendor/ComfyUI/output/
-vendor/ComfyUI/user/
-vendor/ComfyUI/venv/
-
-vendor/SadTalker-Server/checkpoints/
-vendor/SadTalker-Server/tmp_uploads/
-vendor/SadTalker-Server/venv/
-
-vendor/Chatterbox-TTS-Server/model_cache/
-vendor/Chatterbox-TTS-Server/outputs/
-vendor/Chatterbox-TTS-Server/venv/
-
-public/assets/
+# Ignore model weights, vendor repos, and archives
+vendor/
+avatar-engine/
+tooling/
 scratch/
+public/assets/
+public/avatars/master_*_archive/
 
-# GPU servers — not needed in app container
-vendor/Modern-TTS-Server/
-vendor/Modern-TalkingHead-Server/
-vendor/MuseTalk/
-vendor/KeySync-Server/
-vendor/LivePortrait-Server/
-vendor/Modern-Mesh-Server/
-vendor/Modern-Motion-Animation-Server/
+# Data sets not needed in container runtime
+src/data/enriched_presets.json
 
-# Docs, scripts, infra (not needed at runtime)
+# Docs, tests, and infra
 docs/
-scripts/
 infra/
 .agents/
-
-# Test files
 **/__tests__/
+**/tests/
 coverage/
 
 # Logs
 *.log
 logs/
-

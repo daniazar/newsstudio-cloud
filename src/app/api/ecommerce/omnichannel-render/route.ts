@@ -1,6 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderOmnichannelBatch } from "@/lib/ecommerce/omnichannelExporter";
 import { prisma } from "@/lib/prisma";
+import { requireTenant } from "@/lib/tenant";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
+
+export async function GET(req: NextRequest) {
+  const t = await requireTenant();
+  if (!t.ok) return t.response;
+  const orgId = t.tenant.orgId;
+
+  const jobId = new URL(req.url).searchParams.get("jobId");
+  if (!jobId) {
+    return NextResponse.json({ success: false, error: "jobId is required" }, { status: 400 });
+  }
+
+  const job = await prisma.generationJob.findFirst({
+    where: { id: jobId, companyId: orgId },
+  });
+  if (!job) {
+    return NextResponse.json({ success: false, error: "Render job not found" }, { status: 404 });
+  }
+
+  let parsedConfig: Record<string, unknown> = {};
+  try {
+    parsedConfig = job.config ? (JSON.parse(job.config) as Record<string, unknown>) : {};
+  } catch {}
+  const resultObj =
+    parsedConfig.result && typeof parsedConfig.result === "object"
+      ? (parsedConfig.result as Record<string, unknown>)
+      : {};
+
+  return NextResponse.json({
+    success: true,
+    jobId: job.id,
+    status: job.status,
+    progress: job.currentStep || (job.status === "QUEUED" ? "Queued for local worker..." : "Rendering omnichannel batch..."),
+    bundle: resultObj.bundle ?? null,
+    error: job.status === "FAILED" ? job.errorLog || "Omnichannel render failed" : undefined,
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -124,6 +170,51 @@ export async function POST(req: NextRequest) {
         { success: false, error: "Missing required productSpec or script payload" },
         { status: 400 }
       );
+    }
+
+    if (!dryRun && isRemoteWorkerMode()) {
+      let companyId = "default";
+      try {
+        const t = await requireTenant();
+        if (t.ok) companyId = t.tenant.orgId;
+      } catch {}
+
+      const job = await prisma.generationJob.create({
+        data: {
+          companyId,
+          storyId: String(targetCampaignId || productSpec.id || `omnichannel_${Date.now()}`),
+          type: "ecommerce_render",
+          status: "QUEUED",
+          totalSteps: 3,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            kind: "omnichannel",
+            productSpec,
+            script,
+            presenter,
+            watermark,
+            usVsThem,
+            qrCode,
+            socialPopup,
+            audioMode,
+            musicBedUrl,
+            baseMusicVolume,
+            duckingDb,
+            audioUrl,
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json({
+        ok: true,
+        queued: true,
+        success: true,
+        jobId: job.id,
+        status: "QUEUED",
+        message: "Omnichannel render batch queued for local worker execution.",
+      });
     }
 
     const bundle = await renderOmnichannelBatch({

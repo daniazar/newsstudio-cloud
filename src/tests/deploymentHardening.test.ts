@@ -4,37 +4,15 @@ import path from "path";
 import { killService } from "@/lib/telemetry";
 
 describe("Deployment Hardening & Production Container Suite", () => {
-  it("should have a dedicated lightweight Dockerfile.worker-audio", () => {
-    const dockerfilePath = path.resolve(process.cwd(), "Dockerfile.worker-audio");
+  it("should have a production standalone Dockerfile with /api/health/live check", () => {
+    const dockerfilePath = path.resolve(process.cwd(), "Dockerfile");
     expect(fs.existsSync(dockerfilePath)).toBe(true);
 
     const content = fs.readFileSync(dockerfilePath, "utf8");
-    expect(content).toContain("node:20-bookworm-slim");
-    expect(content).toContain("ffmpeg");
-    expect(content).toContain("--role=audio");
-    // Should NOT contain Chromium or Puppeteer (lightweight)
-    expect(content).not.toContain("chromium");
-    expect(content).not.toContain("PUPPETEER_SKIP_CHROMIUM_DOWNLOAD");
-  });
-
-  it("should reference Dockerfile.worker-audio and extra_hosts in docker-compose.ai.yml", () => {
-    const composePath = path.resolve(process.cwd(), "docker-compose.ai.yml");
-    expect(fs.existsSync(composePath)).toBe(true);
-
-    const composeContent = fs.readFileSync(composePath, "utf8");
-    expect(composeContent).toContain("dockerfile: Dockerfile.worker-audio");
-    expect(composeContent).toContain("host.docker.internal:host-gateway");
-    expect(composeContent).toContain("modern-talkinghead");
-  });
-
-  it("should import prisma from @/lib/prisma in scripts/worker-orchestrator.ts (no SQLite hardcoding)", () => {
-    const orchestratorPath = path.resolve(process.cwd(), "scripts/worker-orchestrator.ts");
-    expect(fs.existsSync(orchestratorPath)).toBe(true);
-
-    const orchestratorContent = fs.readFileSync(orchestratorPath, "utf8");
-    expect(orchestratorContent).toContain('import { prisma } from "@/lib/prisma"');
-    expect(orchestratorContent).not.toContain("PrismaBetterSqlite3");
-    expect(orchestratorContent).not.toContain("file:./prisma/dev.db");
+    expect(content).toContain("node:22-alpine");
+    expect(content).toContain("BUILD_STANDALONE=true");
+    expect(content).toContain("/api/health/live");
+    expect(content).toContain(".next/standalone");
   });
 
   it("should support modern_talkinghead in telemetry killService", async () => {

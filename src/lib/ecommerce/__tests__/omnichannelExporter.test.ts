@@ -6,7 +6,6 @@ import {
   OMNICHANNEL_FORMATS,
   renderOmnichannelBatch,
 } from "../omnichannelExporter";
-import { parseArgs } from "../../../../scripts/ecommerce-ad-cli";
 import { ProductSpec, AdScript, ProductAdCompositionProps } from "@/lib/types/ecommerce";
 
 const mockProduct: ProductSpec = {
@@ -145,13 +144,5 @@ describe("1-Click Multi-Aspect Omnichannel Exporter Unit Tests", () => {
     expect(fs.existsSync(bundle.files.tiktokCsvPath)).toBe(true);
     expect(fs.existsSync(bundle.files.googlePmaxJsonPath)).toBe(true);
     expect(fs.existsSync(bundle.files.bundleManifestPath)).toBe(true);
-  });
-
-  it("parses --omnichannel flag in ecommerce-ad-cli", () => {
-    const opts = parseArgs(["--sample=flooring", "--omnichannel"]);
-    expect(opts.omnichannel).toBe(true);
-
-    const defaultOpts = parseArgs(["--sample=flooring"]);
-    expect(defaultOpts.omnichannel).toBe(false);
   });
 });

@@ -22,12 +22,11 @@ import { EditorLeftInspector } from "@/app/ecommerce-studio/components/EditorLef
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface PageProps {
-  params: Promise<{ storeId: string; productId: string }> | { storeId: string; productId: string };
+  params: Promise<{ storeId: string; productId: string }>;
 }
 
 function ProductEditorContent({ params }: PageProps) {
-  const resolvedParams = "then" in params ? use(params as Promise<{ storeId: string; productId: string }>) : params;
-  const { storeId, productId } = resolvedParams;
+  const { storeId, productId } = use(params);
 
   const { toast } = useToast();
   const playerRef = useRef<PlayerRef>(null);

@@ -4,7 +4,7 @@ import { requireTenant } from "@/lib/tenant";
 import { generateLlmObject } from "@/lib/llm/aiSdkGateway";
 import { z } from "zod";
 
-export const PersonaTraitsSchema = z.object({
+const PersonaTraitsSchema = z.object({
   age: z.number().catch(34),
   heightCm: z.number().catch(175),
   heightFeet: z.string().catch("5'9\""),
@@ -18,12 +18,10 @@ export const PersonaTraitsSchema = z.object({
   defaultLighting: z.string().catch("Soft volumetric studio lighting"),
 });
 
-export const PersonaGeneratedPromptsSchema = z.object({
+const PersonaGeneratedPromptsSchema = z.object({
   systemPrompt: z.string().catch("You are an authoritative and engaging news presenter delivering clear, accurate coverage."),
   traits: PersonaTraitsSchema,
 });
-
-export type PersonaGeneratedPrompts = z.infer<typeof PersonaGeneratedPromptsSchema>;
 
 const SYSTEM_INSTRUCTION = `You are an expert AI persona architect for an autonomous AI news channel.
 Your task is to take the basic attributes of a News Presenter and generate structured attributes:

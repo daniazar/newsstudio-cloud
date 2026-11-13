@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { inngest } from "@/inngest/client";
+import { dispatchPublishVideo } from "@/lib/orchestration/dispatch";
 import { requireWorkerKey } from "@/lib/workerAuth";
 
 export async function POST(
@@ -79,10 +79,7 @@ export async function POST(
             },
           });
 
-          await inngest.send({
-            name: "video/publish",
-            data: { publishId: publish.id },
-          });
+          await dispatchPublishVideo({ publishId: publish.id });
 
           return publish;
         })

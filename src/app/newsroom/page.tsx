@@ -6,7 +6,7 @@ import type { StoryModalData } from "@/components/newsroom/NewsPreProductionModa
 import { StoryCardGrid } from "@/components/newsroom/StoryCardGrid";
 import { SortOption,StoryFilterBar } from "@/components/newsroom/StoryFilterBar";
 import { useInfiniteList } from "@/lib/hooks/useInfiniteList";
-import { usePolling } from "@/lib/hooks/usePolling";
+import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback,useEffect,useState } from "react";
@@ -133,18 +133,19 @@ export default function DashboardPage() {
   const _feeds = feedsData?.data ?? feedsData?.feeds ?? [];
   const brands = brandsData?.data ?? brandsData?.brands ?? [];
 
-  // Polling
-  const { enabled: pollingEnabled, interval: pollingInterval } = usePolling();
-
   const fetchData = useCallback(async () => {
     mutateStories();
   }, [mutateStories]);
 
+  // Poll ONLY while loaded stories are actively running in background pipelines
+  const hasActiveStories = stories.some(
+    (s) => s.status === "SCRIPTING" || s.status === "IN_PRODUCTION" || s.status === "RENDERING"
+  );
   useEffect(() => {
-    if (!pollingEnabled) return;
-    const interval = setInterval(fetchData, pollingInterval * 1000);
+    if (!hasActiveStories) return;
+    const interval = setInterval(fetchData, 10_000);
     return () => clearInterval(interval);
-  }, [fetchData, pollingEnabled, pollingInterval]);
+  }, [fetchData, hasActiveStories]);
 
   // Action Handlers
   const handleIngestNow = async () => {
@@ -152,6 +153,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/ingest", { method: "POST" });
       if (res.ok) {
+        void pingLocalWorkerWake("ingest");
         toast("Success", "RSS Ingestion started in background...", "success");
       } else {
         toast("Error", "Could not trigger ingestion", "error");
@@ -179,6 +181,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ action: "send-to-production" }),
       });
       if (res.ok) {
+        void pingLocalWorkerWake("story_production");
         toast("Success", "Dispatched FSM story synthesis job to pipeline!", "success");
       } else {
         toast("Error", "Could not dispatch production job", "error");
@@ -223,6 +226,7 @@ export default function DashboardPage() {
         )
       );
       toast("Success", `Started script synthesis for ${Math.min(5, unscripted.length)} stories.`, "success");
+      void pingLocalWorkerWake("batch_script");
       setTimeout(fetchData, 2500);
     } catch {
       toast("Error", "Batch script synthesis failed", "error");

@@ -20,15 +20,20 @@ const fetcher = async (url: string) => {
 export const AmbientClusterHUD = React.memo(function AmbientClusterHUD() {
   const { enabled: pollingEnabled, interval: pollingInterval } = usePolling();
   const { org: cachedOrg } = useCachedActiveOrg();
+  const isProd = process.env.NODE_ENV === "production";
 
-  const { data: health } = useSWR("/api/health", fetcher, {
-    refreshInterval: pollingEnabled ? pollingInterval * 1000 : 0,
+  const { data: health } = useSWR(isProd ? null : "/api/health", fetcher, {
+    refreshInterval: !isProd && pollingEnabled ? pollingInterval * 1000 : 0,
     revalidateOnFocus: false,
   });
 
   const { data: queueData } = useSWR(cachedOrg?.id ? "/api/pipeline/stats" : null, fetcher, {
-    refreshInterval: pollingEnabled ? pollingInterval * 2000 : 0,
-    revalidateOnFocus: false,
+    refreshInterval: (latestData) => {
+      const queued = latestData?.stats?.queued || 0;
+      const inProgress = latestData?.stats?.inProgress || 0;
+      return queued + inProgress > 0 ? 10_000 : 0;
+    },
+    revalidateOnFocus: true,
   });
 
   const isDegraded = health?.status === "degraded" || health?.status === "unhealthy";

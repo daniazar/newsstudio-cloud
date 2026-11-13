@@ -17,7 +17,16 @@ import { getFFmpegPath } from "@/lib/ai/comfy/utils";
 import { SceneClipSlice } from "@/lib/ecommerce/actionLoopFsmEngine";
 import { requireTenant } from "@/lib/tenant";
 import { ensureTransparentWebmCompanion,sanitizePresenterVideo } from "@/lib/video/presenterSanitizer";
-import { execFileSync } from "child_process";
+import { prisma } from "@/lib/prisma";
+import { broadcastWorkerWake } from "@/lib/worker-broker/supabaseWake";
+
+function isRemoteWorkerMode(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.FORCE_REMOTE_WORKER === "true" ||
+    (process.env.NODE_ENV !== "test" && process.env.ALLOW_API_SPAWN !== "true")
+  );
+}
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api:ecommerce:presenter:lip-sync");
@@ -46,6 +55,64 @@ export async function POST(req: NextRequest) {
       slices,
       asyncWebm = true,
     } = body;
+
+    if (isRemoteWorkerMode()) {
+      let resolvedAudioUrl = typeof audioUrl === "string" ? audioUrl : undefined;
+      if (audioBase64 && typeof audioBase64 === "string") {
+        const audioBuf = Buffer.from(audioBase64, "base64");
+        const key = withTenant(companyId, `ecommerce/lipsync/audio/${personaId}_${Date.now()}.wav`);
+        resolvedAudioUrl = await storage.upload(key, audioBuf, "audio/wav");
+      } else if (resolvedAudioUrl && resolvedAudioUrl.startsWith("data:audio")) {
+        const base64Part = resolvedAudioUrl.split(",")[1];
+        if (base64Part) {
+          const audioBuf = Buffer.from(base64Part, "base64");
+          const key = withTenant(companyId, `ecommerce/lipsync/audio/${personaId}_${Date.now()}.wav`);
+          resolvedAudioUrl = await storage.upload(key, audioBuf, "audio/wav");
+        }
+      }
+
+      if (!resolvedAudioUrl) {
+        return NextResponse.json(
+          { success: false, error: "Valid audioBase64 or audioUrl is required for lip-sync." },
+          { status: 400 }
+        );
+      }
+
+      const createdJob = await prisma.generationJob.create({
+        data: {
+          companyId,
+          storyId: `ecommerce_lipsync_${personaId}`,
+          type: "ecommerce_lipsync",
+          status: "QUEUED",
+          totalSteps: 2,
+          doneSteps: 0,
+          currentStep: "Queued for local worker",
+          config: JSON.stringify({
+            personaId,
+            engine,
+            audioUrl: resolvedAudioUrl,
+            fps,
+            videoUrl: videoUrl || null,
+            loopId: loopId || null,
+            attire: attire || null,
+            avatarUrl: avatarUrl || null,
+            startFrameOffset,
+            slices: Array.isArray(slices) ? slices : null,
+            asyncWebm: Boolean(asyncWebm),
+          }),
+        },
+      });
+      void broadcastWorkerWake("job_queued");
+
+      return NextResponse.json({
+        ok: true,
+        queued: true,
+        success: true,
+        jobId: createdJob.id,
+        status: "QUEUED",
+        message: "Lip-sync job queued for local worker execution.",
+      });
+    }
 
     // Check engine server health
     if (engine === "ditto") {
@@ -189,7 +256,7 @@ export async function POST(req: NextRequest) {
         const startSec = Math.max(0, sl.audioStartFrame / fps);
         const durSec = Math.max(0.1, sl.sliceDurationFrames / fps);
 
-        execFileSync(
+        (await import("child_process")).execFileSync(
           ffmpeg,
           [
             "-y",
@@ -245,7 +312,7 @@ export async function POST(req: NextRequest) {
       const listFile = path.join(tempDir, `concat_list_${timestamp}.txt`);
       const listLines = partFiles.map((p) => `file '${p.replace(/\\/g, "/")}'`).join("\n");
       fs.writeFileSync(listFile, listLines);
-      execFileSync(
+      (await import("child_process")).execFileSync(
         ffmpeg,
         ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", tempOutputPath],
         { stdio: "ignore" }

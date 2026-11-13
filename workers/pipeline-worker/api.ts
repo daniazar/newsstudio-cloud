@@ -1,5 +1,7 @@
 import { config } from "./config";
 import { pooledFetch } from "@/lib/network/httpPool";
+import { ECOMMERCE_MEDIA_JOB_TYPES } from "./tasks/ecommerceMediaTask";
+import type { LlmBrokerClaimedTask, LlmBrokerCompletePayload } from "@/lib/worker-broker";
 
 /**
  * HTTP client for calling the main Next.js app's pipeline API.
@@ -62,15 +64,15 @@ export async function pollQueue(): Promise<QueuedJob | null> {
     if (config.role === "video") {
       // If a specific engine is requested (e.g. --engine=bubble, musetalk, ditto)
       if (config.engine === "bubble") {
-        query = "?type=video_bubble,musetalk,ditto";
+        query = "?type=video_bubble,musetalk,ditto,ecommerce_lipsync";
       } else if (config.engine === "musetalk") {
-        query = "?type=musetalk,video_bubble";
+        query = "?type=musetalk,video_bubble,ecommerce_lipsync";
       } else if (config.engine === "ditto") {
         query = "?type=ditto,video_bubble";
       } else if (config.engine === "full") {
-        query = "?type=video_full,image,turntable_3d,veo,minimax,taomate,ltx";
+        query = `?type=video_full,image,turntable_3d,veo,minimax,taomate,ltx,${ECOMMERCE_MEDIA_JOB_TYPES.join(",")}`;
       } else if (config.engine === "veo") {
-        query = "?type=veo,video_full";
+        query = "?type=veo,video_full,ecommerce_veo";
       } else if (config.engine === "minimax" || config.engine === "taomate") {
         query = "?type=minimax,taomate,video_full";
       } else if (config.engine === "ltx") {
@@ -78,8 +80,14 @@ export async function pollQueue(): Promise<QueuedJob | null> {
       } else {
         // If Mac, we only do bubble. If Windows, we can do both, so we request "video" which the backend will handle or we comma separate
         const isMac = process.platform === "darwin";
-        query = isMac ? "?type=video_bubble,musetalk,ditto" : "?type=video_full,video_bubble,musetalk,ditto,image,turntable_3d,veo,minimax,taomate,ltx";
+        query = isMac
+          ? "?type=video_bubble,musetalk,ditto,ecommerce_lipsync"
+          : `?type=video_full,video_bubble,musetalk,ditto,image,turntable_3d,veo,minimax,taomate,ltx,${ECOMMERCE_MEDIA_JOB_TYPES.join(",")}`;
       }
+    } else if (config.role === "render") {
+      query = "?type=render,ecommerce_render";
+    } else if (config.role === "image") {
+      query = "?type=image,ecommerce_photo,ecommerce_scene,persona_studio_image";
     } else {
       query = `?type=${config.role}`;
     }
@@ -296,4 +304,43 @@ export async function triggerAutoPublish(jobId: string): Promise<{ success: bool
     return { success: false, publishedCount: 0 };
   }
   return res.data;
+}
+
+// ─── Cloud-to-Worker LLM Broker Client ────────────────────────────────────
+
+/** Claim the oldest pending LLM task from the cloud app's in-memory broker */
+export async function claimLlmTask(
+  workerId: string
+): Promise<LlmBrokerClaimedTask | null> {
+  const res = await request<{ task?: LlmBrokerClaimedTask | null }>(
+    "POST",
+    `/api/pipeline/llm-tasks/claim`,
+    { workerId }
+  );
+  if (!res.ok) {
+    return null;
+  }
+  return res.data?.task ?? null;
+}
+
+/** Post the completed (or failed) local LLM result back to the cloud broker */
+export async function completeLlmTask(
+  taskId: string,
+  payload: LlmBrokerCompletePayload
+): Promise<boolean> {
+  const res = await request<{ completed?: boolean }>(
+    "POST",
+    `/api/pipeline/llm-tasks/${encodeURIComponent(taskId)}/complete`,
+    payload
+  );
+  return res.ok && Boolean(res.data?.completed);
+}
+
+/** Trigger a due automation schedule when Supabase PostgREST detects nextRunAt <= now */
+export async function triggerScheduledRun(scheduleId: string): Promise<boolean> {
+  const res = await request<{ success?: boolean }>(
+    "POST",
+    `/api/admin/schedules/${encodeURIComponent(scheduleId)}`
+  );
+  return res.ok && Boolean(res.data?.success);
 }
