@@ -1,0 +1,39 @@
+{
+  "product": {
+    "id": 7819203912,
+    "title": "AeroBuds Pro Active Noise Cancelling Wireless Earbuds",
+    "vendor": "SonicTech",
+    "product_type": "Electronics",
+    "handle": "aerobuds-pro-anc-wireless",
+    "body_html": "<p>Experience crystal clear audio with aerospace-grade 11mm titanium drivers.</p><ul><li>Active Noise Cancellation up to 42dB</li><li>36 Hours battery life with compact charging case</li><li>IPX7 submersible waterproof seal</li><li>WingLock ergonomic zero-slip grip for running</li></ul>",
+    "variants": [
+      {
+        "id": 391029381,
+        "title": "Matte Black",
+        "price": "49.99",
+        "compare_at_price": "99.99",
+        "available": true,
+        "sku": "AERO-BLK",
+        "option1": "Matte Black"
+      },
+      {
+        "id": 391029382,
+        "title": "Starlight Silver",
+        "price": "49.99",
+        "compare_at_price": "99.99",
+        "available": true,
+        "sku": "AERO-SLV",
+        "option1": "Starlight Silver"
+      }
+    ],
+    "images": [
+      {
+        "id": 81923011,
+        "src": "https://cdn.shopify.com/s/files/1/0002/products/aerobuds_hero_grande.png?v=1700000001",
+        "width": 2400,
+        "height": 2400,
+        "alt": "AeroBuds Pro Floating"
+      }
+    ]
+  }
+}

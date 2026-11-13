@@ -1,0 +1,54 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Remotion
+/.remotion
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# Env files (ignore .env* except .env.example)
+.env
+.env*.local
+.env.production
+.env.development
+.env.test
+.env.bak*
+
+# Database & caches
+*.db
+*.db-journal
+*.tsbuildinfo
+.cache/
+
+# Storage & Large Assets
+/storage/
+/public/avatars/
+/public/assets/
+/vendor/
+*.mp4
+*.webm
+*.mov
+*.tar.gz
+*.zip
+
+# OS files
+.DS_Store
+*.pem
+Thumbs.db

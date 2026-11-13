@@ -1,0 +1,192 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "ltx-video-2.5.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" }
+  },
+  "2": {
+    "inputs": {
+      "image": "avatar.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Image" }
+  },
+  "3": {
+    "inputs": {
+      "audio": "voice.wav",
+      "upload": "audio"
+    },
+    "class_type": "LoadAudio",
+    "_meta": { "title": "Load Audio" }
+  },
+  "4": {
+    "inputs": {
+      "text": "Static locked tripod camera shot, stationary camera, zero camera motion, no zoom out, fixed medium shot framing, news anchor Blaze Wilder standing poised against solid green chroma screen with no furniture, fitted cropped black leather moto jacket, black bandeau top, high-waisted leather pants, subtle breathing rhythm, calm poised posture, locked closed lips, strictly closed mouth, steady eye gaze, constant even broadcast lighting, photorealistic 8k.",
+      "clip": ["1", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "5": {
+    "inputs": {
+      "text": "camera movement, zoom, zoom out, pull back, dolly, pan, moving camera, wide shot change, background shift, lighting flicker, color drift, blurry, open mouth, teeth showing.",
+      "clip": ["1", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" }
+  },
+  "6": {
+    "inputs": {
+      "ckpt_name": "ltx-2.5-audio-vae-bf16.safetensors"
+    },
+    "class_type": "LTXVAudioVAELoader",
+    "_meta": { "title": "Load Audio VAE" }
+  },
+  "7": {
+    "inputs": {
+      "audio": ["3", 0],
+      "audio_vae": ["6", 0]
+    },
+    "class_type": "LTXVAudioVAEEncode",
+    "_meta": { "title": "Audio Encode" }
+  },
+  "8": {
+    "inputs": {
+      "width": 544,
+      "height": 960,
+      "length": 65,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": { "title": "Empty Video Latent" }
+  },
+  "9": {
+    "inputs": {
+      "image": ["2", 0],
+      "img_compression": 10
+    },
+    "class_type": "LTXVPreprocess",
+    "_meta": { "title": "Preprocess Image" }
+  },
+  "10": {
+    "inputs": {
+      "vae": ["1", 2],
+      "latent": ["8", 0],
+      "num_images": "1",
+      "num_images.image_1": ["9", 0],
+      "num_images.index_1": 0,
+      "num_images.strength_1": 0.75
+    },
+    "class_type": "LTXVImgToVideoInplaceKJ",
+    "_meta": { "title": "Inplace Conditioning" }
+  },
+  "11": {
+    "inputs": {
+      "video_latent": ["10", 0],
+      "audio_latent": ["7", 0]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": { "title": "Concat AV Latent" }
+  },
+  "12": {
+    "inputs": {
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "frame_rate": 25.0
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": { "title": "LTXV Conditioning" }
+  },
+  "13": {
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["12", 0],
+      "negative": ["12", 1],
+      "cfg": 2.0
+    },
+    "class_type": "CFGGuider",
+    "_meta": { "title": "CFG Guider" }
+  },
+  "14": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "KSampler Select" }
+  },
+  "15": {
+    "inputs": {
+      "steps": 20,
+      "max_shift": 2.05,
+      "base_shift": 0.95,
+      "stretch": true,
+      "terminal": 0.1,
+      "latent": ["11", 0]
+    },
+    "class_type": "LTXVScheduler",
+    "_meta": { "title": "LTXV Scheduler" }
+  },
+  "16": {
+    "inputs": {
+      "noise_seed": 42,
+      "fixed_index": 0
+    },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "Random Noise" }
+  },
+  "17": {
+    "inputs": {
+      "noise": ["16", 0],
+      "guider": ["13", 0],
+      "sampler": ["14", 0],
+      "sigmas": ["15", 0],
+      "latent_image": ["11", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "Sampler" }
+  },
+  "18": {
+    "inputs": {
+      "av_latent": ["17", 0]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": { "title": "Separate AV Latent" }
+  },
+  "19": {
+    "inputs": {
+      "samples": ["18", 0],
+      "vae": ["1", 2],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 16
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": { "title": "Decode Video" }
+  },
+  "20": {
+    "inputs": {
+      "samples": ["18", 1],
+      "audio_vae": ["6", 0]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": { "title": "Decode Audio" }
+  },
+  "21": {
+    "inputs": {
+      "images": ["19", 0],
+      "audio": ["20", 0],
+      "filename_prefix": "ltx_output",
+      "format": "video/nvenc_h264-mp4",
+      "frame_rate": 25.0,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": { "title": "Save Video" }
+  }
+}

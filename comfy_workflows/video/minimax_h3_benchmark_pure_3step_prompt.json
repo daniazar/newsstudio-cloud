@@ -1,0 +1,293 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Ref2VA Model (FP8 Scaled)"
+    }
+  },
+  "2": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "lora_name": "taomate_h3_3step_MAXQUALITY_bf16.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "TaoMate 2-Step Turbo LoRA"
+    }
+  },
+  "3": {
+    "class_type": "ModelAttentionBackend",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "attention": "comfy kitchen attention"
+    },
+    "_meta": {
+      "title": "Comfy Kitchen Low-VRAM Attention"
+    }
+  },
+  "4": {
+    "class_type": "MiniMaxChunkFeedForward",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "chunks": 8,
+      "seq_threshold": 2048
+    },
+    "_meta": {
+      "title": "MiniMax Chunk FeedForward (8 chunks)"
+    }
+  },
+  "5": {
+    "class_type": "MiniMaxLowVRAMAttention",
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "head_chunks": 8
+    },
+    "_meta": {
+      "title": "MiniMax Low VRAM Attention (8 head chunks)"
+    }
+  },
+  "6": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "_meta": {
+      "title": "MiniMax H3 Sigma Shift (Video 12 / Audio 3)"
+    }
+  },
+  "7": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "MiniMax Qwen3-VL-32B CLIP"
+    }
+  },
+  "8": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Video VAE (INT8 ConvRot)"
+    }
+  },
+  "9": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Audio VAE (FP32)"
+    }
+  },
+  "10": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "ruby_studio_benchmark.jpg"
+    },
+    "_meta": {
+      "title": "Input Studio Desk Image"
+    }
+  },
+  "11": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "ruby_speech_10s.wav"
+    },
+    "_meta": {
+      "title": "Input Speech Audio (10s)"
+    }
+  },
+  "12": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "clip": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "prompt": "integrated_multimodal_description: [Shot 1] <Picture 1> <Audio 1> (S1) Medium shot, fixed stationary tripod camera, shallow depth of field. Professional female news anchor Ruby in dark green tailored blazer is seated behind a modern executive glass newsroom desk with laptop and financial charts. Ruby looks directly into the lens and speaks the news report with natural conversational lip movements and subtle head tilts. <d>[English] Good evening. Tonight, we bring you an exclusive report on major technological breakthroughs, transforming global markets and public policy.</d>\n\noverall_soundscape: Professional broadcast studio acoustics, subtle ambient newsroom atmosphere, clear studio microphone vocal pickup.\n\nnon_diegetic_music: N/A",
+      "width": 768,
+      "height": 1376,
+      "length": 243,
+      "ref_image_size": "match",
+      "ref_images.ref_image_0": [
+        "10",
+        0
+      ],
+      "ref_audios.ref_audio_0": [
+        "11",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Reference-to-Video (Ref2VA)"
+    }
+  },
+  "13": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "conditioning": [
+        "12",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "14": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "_meta": {
+      "title": "Sampler (res_multistep)"
+    }
+  },
+  "15": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 3,
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "Scheduler (simple, 3 steps)"
+    }
+  },
+  "16": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 20260922,
+      "control_after_generate": "fixed"
+    },
+    "_meta": {
+      "title": "Fixed Random Noise"
+    }
+  },
+  "17": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "16",
+        0
+      ],
+      "guider": [
+        "13",
+        0
+      ],
+      "sampler": [
+        "14",
+        0
+      ],
+      "sigmas": [
+        "15",
+        0
+      ],
+      "latent_image": [
+        "12",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Diffusion Sampler (TaoMate 2-Step)"
+    }
+  },
+  "18": {
+    "class_type": "VRAM_Debug",
+    "inputs": {
+      "empty_cache": true,
+      "gc_collect": true,
+      "unload_all_models": true,
+      "any_input": [
+        "17",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "VRAM Cache Flush (Pre-Decode)"
+    }
+  },
+  "19": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "18",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode Video Latent (INT8 ConvRot VAE)"
+    }
+  },
+  "20": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "19",
+        0
+      ],
+      "audio": [
+        "11",
+        0
+      ],
+      "frame_rate": 24.0,
+      "loop_count": 0,
+      "filename_prefix": "MiniMax_H3_Benchmark_TaoMate3Step/Ruby_Studio_Pure",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 18,
+      "pingpong": false,
+      "save_output": true
+    },
+    "_meta": {
+      "title": "VHS Video Combine & Mux"
+    }
+  }
+}

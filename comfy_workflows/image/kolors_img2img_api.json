@@ -1,0 +1,84 @@
+{
+  "1": {
+    "inputs": {
+      "image": "input_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Source Image" }
+  },
+  "2": {
+    "inputs": {
+      "ckpt_name": "Kolors/Kolors_base.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Kolors Model" }
+  },
+  "3": {
+    "inputs": {
+      "text": "一个专业的新闻播音员，写实的肖像，高清摄影，演播室背景 (A professional news presenter, realistic portrait, high definition photography, studio background)",
+      "clip": ["2", 1]
+    },
+    "class_type": "ChatGLM3TextEncode",
+    "_meta": { "title": "ChatGLM3 Text Encode (Positive)" }
+  },
+  "4": {
+    "inputs": {
+      "text": "模糊，低画质，畸形，怪异 (blurry, low quality, distorted, deformed)",
+      "clip": ["2", 1]
+    },
+    "class_type": "ChatGLM3TextEncode",
+    "_meta": { "title": "ChatGLM3 Text Encode (Negative)" }
+  },
+  "9": {
+    "inputs": {
+      "lora_name": "kolors_custom_person.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": ["2", 0],
+      "clip": ["2", 1]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "Load Kolors Person LoRA" }
+  },
+  "5": {
+    "inputs": {
+      "pixels": ["1", 0],
+      "vae": ["2", 2]
+    },
+    "class_type": "VAEEncode",
+    "_meta": { "title": "VAE Encode" }
+  },
+  "6": {
+    "inputs": {
+      "seed": 42,
+      "steps": 25,
+      "cfg": 5.0,
+      "sampler_name": "euler",
+      "scheduler": "karras",
+      "denoise": 0.5,
+      "model": ["9", 0],
+      "positive": ["3", 0],
+      "negative": ["4", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler (Kolors img2img)" }
+  },
+  "7": {
+    "inputs": {
+      "samples": ["6", 0],
+      "vae": ["2", 2]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "8": {
+    "inputs": {
+      "images": ["7", 0],
+      "filename_prefix": "kolors_img2img_output"
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Output Image" }
+  }
+}

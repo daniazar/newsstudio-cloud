@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRA Dataset Generation Studio V11</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #10b981;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-sm {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #10b981;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        /* Modal transitions */
+        .modal-bg {
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-panel {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .modal-hidden .modal-bg {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .modal-hidden .modal-panel {
+            transform: scale(0.95);
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="h-screen overflow-hidden flex flex-col relative">
+
+    <!-- Header -->
+    <header
+        class="bg-slate-900 border-b border-slate-800 p-4 flex flex-col md:flex-row gap-4 justify-between items-center z-10 shrink-0">
+        <div>
+            <h1 class="text-2xl font-bold text-emerald-400 flex items-center gap-2">
+                LoRA Studio
+                <span class="text-xs bg-emerald-900 text-emerald-300 px-2 py-1 rounded">V11 Stable</span>
+            </h1>
+            <p class="text-sm text-slate-400">High-Res Zip | Persona Editor | Zero-Freeze Rendering</p>
+        </div>
+
+        <div class="flex items-center gap-3 flex-wrap justify-center">
+            <button onclick="openPersonaEditor()"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-md transition-all text-sm font-medium flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                        d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Edit Personas
+            </button>
+
+            <div class="bg-slate-800 p-1 rounded-lg flex items-center border border-slate-700 ml-2">
+                <button id="btnViewSingle" onclick="switchView('single')"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all bg-slate-600 text-white shadow-sm">Single</button>
+                <button id="btnViewGrid" onclick="switchView('grid')"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all text-slate-400 hover:text-white">Grid</button>
+            </div>
+
+            <button id="downloadZipBtn" onclick="exportZip()"
+                class="hidden bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md shadow-lg transition-all flex items-center gap-2 text-sm font-medium ml-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                        clip-rule="evenodd" />
+                </svg>
+                Export High-Res ZIP
+            </button>
+        </div>
+    </header>
+
+    <div id="toast"
+        class="fixed top-20 right-4 hidden px-4 py-3 bg-emerald-500 text-white rounded-md shadow-2xl transition-opacity duration-300 z-[100] flex items-center gap-2 font-medium">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clip-rule="evenodd" />
+        </svg>
+        <span id="toastMsg">Notification</span>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- SHARED SETTINGS PANEL -->
+        <div id="sharedSettings"
+            class="absolute left-0 top-0 bottom-0 w-1/3 md:w-1/4 bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden shrink-0 min-w-[280px] z-20">
+            <div class="p-4 border-b border-slate-700 bg-slate-800/50 space-y-4">
+                <div>
+                    <label for="personaSelect"
+                        class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">1. Select
+                        Persona</label>
+                    <select id="personaSelect"
+                        class="w-full p-2 bg-slate-900 border border-slate-600 text-slate-100 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none text-sm cursor-pointer">
+                        <!-- Options injected by JS -->
+                    </select>
+                </div>
+
+                <div class="bg-slate-900/50 p-3 rounded-md border border-slate-700">
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">2. Reference
+                            Image (Clone Face)</label>
+                        <span id="activePersonaRefLabel"
+                            class="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">Ruby</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <label
+                            class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded transition-colors border border-slate-600 shrink-0">
+                            Upload
+                            <input type="file" id="refImageInput" accept="image/jpeg, image/png, image/webp"
+                                class="hidden" onchange="handleImageUpload(event)">
+                        </label>
+                        <div id="refImageThumbnail"
+                            class="hidden h-8 w-8 rounded-full border border-indigo-500 bg-cover bg-center shrink-0">
+                        </div>
+                        <button id="clearRefBtn" class="hidden text-slate-500 hover:text-red-400 text-xs font-medium"
+                            onclick="clearReferenceImage()">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Single View specific sidebar list -->
+            <div id="sidebarListContainer" class="flex-1 flex flex-col overflow-hidden">
+                <div class="p-3 border-b border-slate-700 bg-slate-800/80 flex justify-between items-center shrink-0">
+                    <h2 class="font-semibold text-slate-200 uppercase tracking-wider text-xs">3. Video Dataset (48)</h2>
+                    <span id="completionCounter"
+                        class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded">0/48</span>
+                </div>
+                <div id="scenarioList" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1"></div>
+
+                <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
+                    <button id="generateAllBtnSingle" onclick="toggleGenerateAll()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg font-semibold shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        Auto-Generate All 48
+                    </button>
+                    <div id="batchProgressContainer" class="hidden mt-3">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-indigo-400 font-medium">Batch Progress</span>
+                            <span id="batchProgressText" class="text-slate-400 font-mono">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-1.5">
+                            <div id="batchProgressBar" class="bg-indigo-500 h-1.5 rounded-full progress-bar"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SINGLE VIEW -->
+        <section id="singleView"
+            class="flex-1 bg-slate-900 flex flex-col overflow-y-auto custom-scrollbar p-4 md:p-6 relative ml-[33.333333%] md:ml-[25%] transition-all">
+            <div class="max-w-4xl w-full mx-auto space-y-6 pb-20">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 md:p-6 shadow-sm">
+                    <div class="flex justify-between items-start mb-3">
+                        <h2 id="currentScenarioTitle" class="text-lg md:text-xl font-bold text-emerald-400">Select a
+                            Scenario</h2>
+                        <span id="currentScenarioBadge"
+                            class="px-3 py-1 bg-slate-700 text-slate-300 text-xs rounded-full font-medium">--</span>
+                    </div>
+                    <p id="currentScenarioDesc" class="text-slate-400 text-sm mb-4">Choose an image from the sidebar to
+                        begin.</p>
+
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 relative">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-xs text-emerald-500 uppercase tracking-wider font-bold">Editable Prompt</h4>
+                            <button onclick="resetCurrentPrompt()"
+                                class="text-slate-400 hover:text-white text-xs underline">Reset to Default</button>
+                        </div>
+                        <textarea id="currentPromptText" onchange="saveCurrentPrompt()"
+                            class="w-full bg-slate-800 text-slate-200 border border-slate-600 rounded-md p-3 text-sm font-mono h-32 focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+                    </div>
+
+                    <div id="editControlsSingle" class="hidden mt-4 pt-4 border-t border-slate-700">
+                        <h4 class="text-xs text-indigo-400 uppercase tracking-wider font-bold mb-2">Refine Generated
+                            Image</h4>
+                        <div class="flex gap-2">
+                            <input type="text" id="editInstructionSingle"
+                                placeholder="e.g., 'fix the hands', 'change shirt color to blue'"
+                                class="flex-1 bg-slate-900 border border-slate-600 text-slate-200 text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <button onclick="triggerEditSingle()"
+                                class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-1 shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
+                                    fill="currentColor">
+                                    <path
+                                        d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                                Apply Inpaint
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center min-h-[400px] md:min-h-[500px] relative shadow-sm">
+                    <button id="generateBtnSingle" onclick="triggerGenerationSingle()"
+                        class="absolute top-4 right-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-semibold shadow-md transition-all flex items-center justify-center gap-2 text-sm z-20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        Generate Image
+                    </button>
+
+                    <div id="imageContainer" class="w-full h-full flex flex-col items-center justify-center pt-14">
+                    </div>
+
+                    <div id="loadingStateSingle"
+                        class="hidden absolute inset-0 bg-slate-800/95 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl z-10">
+                        <div class="loader mb-4"></div>
+                        <p id="loadingTitleSingle" class="text-emerald-400 font-medium">Synthesizing Pixels...</p>
+                        <p id="loadingSubtitleSingle" class="text-slate-400 text-sm mt-2 text-center">Connecting to
+                            API...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRID VIEW -->
+        <section id="gridView"
+            class="hidden flex-1 bg-slate-900 flex-col overflow-y-auto custom-scrollbar p-4 md:p-6 ml-[33.333333%] md:ml-[25%] transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-slate-200">Dataset Grid <span id="gridCompletionCounter"
+                        class="text-emerald-400 text-base font-normal ml-2">0/48</span></h2>
+                <button id="generateAllBtnGrid" onclick="toggleGenerateAll()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    Auto-Generate All 48
+                </button>
+            </div>
+            <div id="gridContainer" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 pb-20"></div>
+        </section>
+
+    </div>
+
+    <!-- PERSONA EDITOR MODAL -->
+    <div id="personaModal" class="modal-hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="modal-bg absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closePersonaEditor()"></div>
+        <div
+            class="modal-panel relative bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col z-10 mx-4">
+
+            <div class="flex justify-between items-center p-5 border-b border-slate-700 bg-slate-800/80 rounded-t-xl">
+                <h3 class="text-lg font-bold text-slate-200">Persona Editor</h3>
+                <button onclick="closePersonaEditor()" class="text-slate-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+
+                <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Edit
+                            Existing</label>
+                        <select id="editPersonaSelect" onchange="loadPersonaIntoEditor()"
+                            class="w-full p-2 bg-slate-900 border border-slate-600 text-slate-100 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none text-sm cursor-pointer"></select>
+                    </div>
+                    <span class="text-slate-500 font-bold mt-4">OR</span>
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-indigo-400 uppercase tracking-wider block mb-1">Import
+                            Custom JSON</label>
+                        <label
+                            class="cursor-pointer flex items-center justify-center gap-2 w-full p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors text-sm font-medium">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Upload File
+                            <input type="file" id="jsonUploadInput" accept=".json" class="hidden"
+                                onchange="handleJSONUpload(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Name</label>
+                            <input type="text" id="editP_name"
+                                class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label
+                                class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Age</label>
+                            <input type="text" id="editP_age"
+                                class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Body
+                            Build</label>
+                        <input type="text" id="editP_body"
+                            class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Identifying
+                            Details (Face/Hair/Marks)</label>
+                        <textarea id="editP_details" rows="3"
+                            class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Base
+                            Attire</label>
+                        <textarea id="editP_attire" rows="2"
+                            class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar"></textarea>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="p-4 border-t border-slate-700 bg-slate-800/80 rounded-b-xl flex justify-between items-center">
+                <button onclick="clearAllCache()"
+                    class="text-red-400 hover:text-red-300 text-xs font-medium underline">Reset Entire App
+                    Database</button>
+                <div class="flex gap-3">
+                    <button onclick="closePersonaEditor()"
+                        class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md text-sm font-medium transition-colors">Cancel</button>
+                    <button onclick="savePersonaEdits()"
+                        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-sm font-medium transition-colors">Save
+                        Persona</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Environment Config ---
+        const apiKey = "";
+        localforage.config({ name: 'LoRA_Studio_DB', storeName: 'dataset_cache' });
+
+        // References & State
+        let isGeneratingAll = false;
+        let currentScenarioIndex = 0;
+        let currentViewMode = 'single';
+
+        // Memory Stores
+        let generatedImages = {};
+        let customPrompts = {};
+        let referenceImages = {};
+        let activeGenerations = new Set();
+
+        // --- Dynamic Personas Array ---
+        let personas = [];
+
+        const seedPersonas = [
+            { name: "Ruby", age: "34", body: "Curvy hourglass figure, voluptuous bust (36DD), slim waist.", details: "Face/Skin: Pale, flawless white skin with faint natural freckles across the bridge of the nose | Hair: Vibrant, voluminous wavy copper-red hair | Eyes: Bright green eyes | Marks: Small natural birthmark on the left side of the neck", attire: "A tailored dark forest-green blazer over a black v-neck blouse." },
+            { name: "Storm", age: "29", body: "Athletic, toned build, prominent abs, curvy lower body, bust size 36D.", details: "Face shape: Strong square jawline, fair skin with a few natural freckles | Hair: Messy, windblown auburn hair tied in a practical mid-ponytail | Eyes: Intense, focused piercing green eyes, no makeup | Jewelry: Simple small silver hoop earrings", attire: "A dark grey, weather-resistant tactical windbreaker zipped halfway, over a tight black turtleneck." },
+            { name: "Luna", age: "42", body: "Petite, slender build, small bust size (32B).", details: "Face shape: Heart-shaped face, soft porcelain skin | Hair: Wild, voluminous curly ginger-auburn hair cascading down to her chest | Eyes: Soft, warm brown eyes, framed by thick-rimmed tortoiseshell artistic glasses | Jewelry: Dangling bohemian turquoise earrings, several thin rings on her fingers", attire: "A cozy, oversized mustard-yellow chunky knit sweater over a white collar." },
+            { name: "Blaze", age: "24", body: "Very fit, curvy, prominent bust (34DD), extremely toned waist and abs, thick hips.", details: "Face shape: Diamond-shaped face, glowing tanned skin, sharp contouring | Hair: Sharp, asymmetrical platinum blonde bob haircut, perfectly straightened | Eyes: Bright blue eyes, dramatic winged eyeliner, glossy nude lips | Jewelry: Large silver hoop earrings, a thick silver choker necklace", attire: "A flashy, metallic silver bomber jacket left open over a tight neon pink crop top." },
+            { name: "Dr. Aris", age: "55", body: "Lean, healthy, broad shoulders, upright excellent posture.", details: "Face shape: Rectangular face, slight age lines around the eyes, tanned Caucasian skin | Hair: Neatly combed, thick silver-grey hair parted on the right | Facial Hair: Clean-shaven, entirely smooth | Eyes: Trustworthy, calm light blue eyes, thin wire-rimmed reading glasses resting low on the nose", attire: "A crisp white button-down shirt under a professional charcoal grey suit jacket, with a black stethoscope subtly draped around his neck." },
+            { name: "Atlas", age: "65", body: "Burly, solid build, thick neck, broad chest.", details: "Face shape: Square, weathered face with deep character lines, tanned skin | Hair: Short, receding dark hair mixed with salt-and-pepper grey | Facial Hair: A neatly trimmed, thick white and grey full beard and connected mustache | Eyes: Deep-set, wise dark brown eyes", attire: "A sophisticated, thick dark grey cashmere turtleneck sweater." },
+            { name: "Hawk", age: "45", body: "Muscular underneath his suit, wide chest, very fit.", details: "Face shape: Strong, chiseled jawline, sharp cheekbones, fair skin | Hair: Short, slicked-back dark brown hair, perfectly styled with pomade | Facial Hair: Very faint 5 o'clock shadow, otherwise clean-shaven | Eyes: Piercing, intense grey eyes, focused expression", attire: "A crisp white dress shirt, a bold crimson-red power tie, and a classic beige trench coat worn open." },
+            { name: "Volt", age: "32", body: "Extremely muscular, bodybuilder physique, massive biceps, very low body fat, defined jaw muscles.", details: "Face shape: Round but lean face, dark olive skin | Hair: Faded buzzcut with sharp edge-up lines | Facial Hair: A sharp, thin chinstrap beard and thin mustache | Eyes: Wide, excited dark brown eyes", attire: "A tight, sleek branded athletic black polo shirt that tightly hugs his muscles." },
+            { name: "Isabel", age: "40", body: "Voluptuous, curvy Latina figure, prominent bust (36DD), wide hips, thick thighs, tiny waist.", details: "Face shape: Oval face, warm golden-brown skin, flawless makeup | Hair: Long, thick, voluminous dark brown waves falling gracefully over both shoulders | Eyes: Large, expressive dark brown eyes, thick mascara, defined dark eyebrows | Jewelry: Medium-sized gold hoop earrings, a delicate gold cross necklace", attire: "A vibrant crimson-red tailored dress with a subtle V-neck." },
+            { name: "Claire", age: "36", body: "Very tall and slim, runway model physique, small bust (32A), long neck.", details: "Face shape: Sharp, angular face, pale skin, defined cheekbones | Hair: A short, stylish, effortless messy brunette bob with straight bangs | Eyes: Icy blue eyes, minimal makeup, classic red lipstick | Jewelry: Tiny pearl stud earrings", attire: "A classic beige trench coat belted at the waist, with a black-and-white patterned silk scarf around her neck." },
+            { name: "Marcos", age: "48", body: "Average build, slightly broad shoulders, well-maintained posture.", details: "Face shape: Round face, warm olive skin | Hair: Thick, neatly combed-back jet-black hair with slight greying at the temples | Facial Hair: A very neatly trimmed goatee and connected mustache | Eyes: Warm, intelligent dark eyes, wearing expensive rectangular wire-rimmed glasses", attire: "A tailored navy pinstripe suit, crisp white shirt, and a light blue silk tie." },
+            { name: "Luca", age: "42", body: "Fit, athletic Mediterranean build, broad chest.", details: "Face shape: Strong, rugged jawline, tanned Mediterranean skin | Hair: Wavy, slightly long dark brown hair, casually styled | Facial Hair: A thick, perfectly maintained 5-day stubble beard | Eyes: Expressive, deep hazel eyes, thick dark eyebrows", attire: "A stylish, slightly wrinkled sand-colored linen suit jacket worn over a crisp white open-collar shirt (top two buttons undone)." },
+            { name: "Kai", age: "28", body: "Slim, lanky build, very lean.", details: "Face shape: Narrow, angular face, pale skin | Hair: Trendy platinum blonde undercut, long on top and swept forward | Facial Hair: Clean-shaven | Eyes: Pale blue eyes, wearing futuristic clear-framed AR-style smart glasses", attire: "A minimalist matte black hoodie with subtle neon blue zipper accents." },
+            { name: "Abigail", age: "31", body: "Very curvy, voluptuous hourglass figure, large bust (36DD), thick thighs, small waist.", details: "Face shape: Round, cheerful face, rosy cheeks, fair skin | Hair: Bright golden-blonde hair styled in loose, bouncy waves falling past her shoulders | Eyes: Bright, wide, sparkling blue eyes, warm smile showing perfect white teeth | Jewelry: Pearl drop earrings", attire: "A vibrant, tailored yellow sheath dress that tightly hugs her curves." },
+            { name: "Adrian", age: "49", body: "Very lean, gaunt, strict posture.", details: "Face shape: Long, sharp features, pronounced cheekbones, pale skin | Hair: Thinning, slicked-back dark grey hair | Facial Hair: Clean-shaven | Eyes: Cold, sharp grey eyes, serious expression", attire: "A formal, dark grey three-piece suit, crisp white collar, and a subtle striped tie." },
+            { name: "Austin", age: "30", body: "Fit, athletic, relaxed posture.", details: "Face shape: Friendly oval face, lightly tanned skin | Hair: Messy, textured dirty-blonde hair | Facial Hair: A short, neat ginger-blonde beard | Eyes: Friendly green eyes", attire: "A casual, well-fitted grey blazer over a dark blue branded tech-startup t-shirt." },
+            { name: "Connor", age: "35", body: "Broad shoulders, solid build, very fit.", details: "Face shape: Square jawline, slightly aggressive confident look, lightly tanned skin | Hair: Slicked-back, Wall-Street style dark hair with high shine pomade | Facial Hair: Clean-shaven | Eyes: Intense, focused brown eyes", attire: "A sharp, expensive tailored royal blue suit with a crisp white shirt, top button undone, no tie." },
+            { name: "Eli", age: "44", body: "Very thin, slouching posture, slight build.", details: "Face shape: Pale, angular face with dark circles under the eyes | Hair: Long, unkempt, greasy black hair pushed behind the ears | Facial Hair: A patchy, thin dark goatee | Eyes: Paranoid, darting dark eyes", attire: "A simple, dark grey zip-up hoodie over a black t-shirt." },
+            { name: "Everett", age: "72", body: "Frail, slightly hunched, elderly build.", details: "Face shape: Deeply wrinkled, kind face, age spots, pale skin | Hair: Very thin, wispy white hair | Facial Hair: Clean-shaven | Eyes: Soft, watery blue eyes behind round, thick-lensed professorial spectacles", attire: "A classic brown tweed jacket with leather elbow patches over a beige sweater vest and bowtie." },
+            { name: "Ian", age: "52", body: "Rugged, broad, tough build, thick arms.", details: "Face shape: Weathered, heavily sun-damaged skin, deep wrinkles around the eyes | Hair: Short, dusty, greying brown hair | Facial Hair: A thick, unkempt, bushy grey and brown beard | Eyes: Tired, hardened green eyes", attire: "A dusty khaki safari shirt with rolled-up sleeves, an olive-green tactical vest over it." },
+            { name: "Jade", age: "26", body: "Very slim, petite, fashion-model build, small bust (32B), extremely toned stomach.", details: "Face shape: Heart-shaped face, flawless dewy Korean-glass skin | Hair: Long, straight hair dyed in a vibrant two-tone split (half black, half pastel pink) | Eyes: Large, expressive brown eyes, heavy mascara, bright pink glossy lips | Jewelry: Multiple ear piercings with diamond studs, a delicate gold body chain visible", attire: "A high-fashion, avant-garde bright orange silk crop top with dramatic ruffled sleeves." },
+            { name: "Jeremiah", age: "46", body: "Dad-bod, slightly overweight but broad-shouldered, exhausted posture.", details: "Face shape: Round, puffy face, dark bags under the eyes, pale skin | Hair: Messy, thinning brown hair | Facial Hair: A thick, messy 3-day stubble | Eyes: Determined, exhausted dark brown eyes", attire: "An untucked, heavily wrinkled light blue button-down shirt with the sleeves rolled up and collar unbuttoned, tie loosened around his neck." },
+            { name: "Jordan", age: "48", body: "Massive, ex-linebacker build, incredibly broad shoulders, thick neck, imposing figure.", details: "Face shape: Wide, blocky face, tanned skin | Hair: Completely bald, shiny head | Facial Hair: A very prominent, thick black horseshoe mustache | Eyes: Intense, wide dark eyes, mid-yell expression", attire: "A loud, bold red-and-white checkered sports coat over a black open-collared shirt." },
+            { name: "Layla", age: "33", body: "Fit, athletic build, moderate bust (34C).", details: "Face shape: Oval, intelligent face, warm brown skin (South Asian descent) | Hair: Long, thick black hair tied back neatly in a tight bun | Eyes: Large, curious dark brown eyes | Jewelry: Small silver stud earrings", attire: "A crisp, bright white laboratory coat worn over a smart navy-blue silk blouse." },
+            { name: "Michael", age: "38", body: "Slim, relaxed build, casual posture.", details: "Face shape: Friendly, approachable face, deep dimples when smiling, fair skin | Hair: Neatly parted, wavy light brown hair | Facial Hair: Clean-shaven | Eyes: Warm, inviting hazel eyes", attire: "A casual but neat, light-blue open-collar linen shirt, sleeves rolled up slightly." },
+            { name: "Miles", age: "58", body: "Fit, military-style rigid posture, broad chest.", details: "Face shape: Strong, angular jaw, weathered skin from high altitudes | Hair: High-and-tight military buzzcut, grey hair | Facial Hair: Clean-shaven | Eyes: Piercing ice-blue eyes", attire: "A vintage, high-quality brown leather aviator bomber jacket with a faux-fur collar, worn over a white shirt and black tie." },
+            { name: "Taylor", age: "45", body: "Very slim, angular, sharp posture, small bust (34B).", details: "Face shape: Sharp, aggressive cheekbones, pale skin, thin lips | Hair: Severe, slicked-back jet-black hair tied tightly in a low knot | Eyes: Intense, piercing dark eyes staring directly into the camera, framed by sleek, angular black designer glasses | Jewelry: None", attire: "An authoritative, form-fitting black turtleneck sweater." },
+            { name: "Thomas", age: "68", body: "Stocky, wealthy build, wide torso.", details: "Face shape: Round, jovial but serious face, flushed skin | Hair: Distinguished, thick, perfectly coiffed silver-white hair | Facial Hair: Clean-shaven | Eyes: Dark, serious brown eyes", attire: "A very formal, extremely expensive-looking heavy grey wool suit, a crisp white French-cuff shirt, and a thick burgundy silk tie." }
+        ];
+
+        // --- 48 Scenarios ---
+        const scenarios = [
+            { id: 1, type: "Frontal Headshot", desc: "Full frontal headshot, looking directly at camera.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 2, type: "45-Degree Left", desc: "45-degree three-quarter view from the left, looking slightly away.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 3, type: "45-Degree Right", desc: "45-degree three-quarter view from the right.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 4, type: "Profile Left", desc: "Hard 90-degree side profile view from the left, sharp jawline focus.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 5, type: "Profile Right", desc: "Hard 90-degree side profile view from the right.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 6, type: "Looking Up", desc: "Head tilted up, looking toward the ceiling, exposing the neck and underside of the jaw.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 7, type: "Looking Down", desc: "Head tilted down, looking toward the floor, eyelids heavily visible.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 8, type: "Slight Smile", desc: "Friendly professional closed-mouth smile, subtle cheek elevation.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 9, type: "Wide Smile", desc: "Wide open-mouth smile showing teeth prominently, joyful expression.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 10, type: "Speech 'O'", desc: "Mid-speech, mouth formed in a tight 'O' or 'U' vowel shape.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 11, type: "Speech 'E'", desc: "Mid-speech, mouth stretched wide horizontally in an 'E' or 'S' shape, teeth slightly parted.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 12, type: "Blinking", desc: "Eyes completely closed, neutral face, highlighting eyelid skin texture.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 13, type: "Serious/Angry", desc: "Serious and concerned expression, deeply furrowed brow, narrowed eyes.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 14, type: "Candid Laugh", desc: "Candid mid-laugh, mouth wide open, eyes crinkling.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 15, type: "Extreme Macro", desc: "Extreme close-up macro photography focusing tightly on the eyes and bridge of the nose.", bg: "Out of focus void, completely blurred neutral." },
+            { id: 16, type: "Neck Rotation", desc: "Medium shot, shoulders facing forward but neck rotated 45 degrees looking to the side, capturing neck muscle definition.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 17, type: "Touching Hair/Face", desc: "Medium close-up, one hand casually tucking hair behind the ear or adjusting a collar.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 18, type: "Open Palm Gesture", desc: "Medium shot, both hands raised in an open-palm explaining gesture, dynamic broadcast pose.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 19, type: "Drinking from Mug", desc: "Medium close-up, holding a coffee mug near the mouth, lips slightly parted.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 20, type: "Hands Near Face", desc: "Medium shot, hands raised near the chin or cheek in a thoughtful gesture.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 21, type: "Holding Microphone", desc: "Medium close-up, holding a broadcast news microphone up to the mouth, engaged expression.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 22, type: "Reading Script Papers", desc: "Waist-up shot, looking down slightly, holding a stack of printed news scripts in both hands.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 23, type: "Taking Notes", desc: "Waist-up shot, seated at a desk, looking down and writing on a notepad with a pen.", bg: "Solid, neutral medium-grey seamless studio backdrop (minimalist desk allowed)." },
+            { id: 24, type: "Typing on Laptop", desc: "Waist-up shot, seated at a desk, hands actively typing on a sleek modern laptop keyboard.", bg: "Solid, neutral medium-grey seamless studio backdrop (minimalist desk allowed)." },
+            { id: 25, type: "Touching Earpiece", desc: "Medium close-up, pressing one finger against an IFB earpiece in the ear, listening intently to a producer.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 26, type: "Pointing at Graphic", desc: "Waist-up shot, standing, gesturing and pointing firmly to the side at an invisible data graphic.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 27, type: "Leaning on News Desk", desc: "Waist-up shot, standing behind a news desk, leaning forward aggressively with both hands flat on the desk.", bg: "Solid, neutral medium-grey seamless studio backdrop (minimalist desk allowed)." },
+            { id: 28, type: "Interview Listening", desc: "Medium shot, angled slightly, holding a microphone out towards someone off-screen, listening attentively.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 29, type: "Full Body Neutral", desc: "Standing full-body shot, feet visible, professional posture.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall." },
+            { id: 30, type: "Full Body Walking Front", desc: "Full-body walking shot toward the camera, dynamic pose, movement in hair.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall. (NO outdoors, NO trees, NO streets)." },
+            { id: 31, type: "Walking Side Profile Left", desc: "Full-body shot, walking laterally across the frame from left to right, side profile visible.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall." },
+            { id: 32, type: "Walking Side Profile Right", desc: "Full-body shot, walking laterally across the frame from right to left, side profile visible.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall." },
+            { id: 33, type: "Walking Away Looking Back", desc: "Full-body shot, walking away from the camera but looking back over the shoulder.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall." },
+            { id: 34, type: "Seated Waist-Up Neutral", desc: "Waist-up shot, seated neutrally behind a minimalist modern desk.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 35, type: "Sitting Casually", desc: "Full-body shot, sitting casually on a stool with legs crossed, relaxed posture.", bg: "Solid, neutral medium-grey seamless studio cyclorama wall." },
+            { id: 36, type: "Over-The-Shoulder", desc: "View from behind the shoulder, back of the head visible, face turned back in profile.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 37, type: "High Angle", desc: "Camera positioned high looking down at the subject.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 38, type: "Low Angle", desc: "Camera positioned low looking up at the subject.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 39, type: "Extreme Dutch Angle", desc: "Dynamic medium shot tilted at a 30-degree Dutch angle, dramatic framing.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 40, type: "Harsh Side Light", desc: "Dramatic side-lighting, deep shadows on one side of the face.", bg: "Pitch black studio void." },
+            { id: 41, type: "Soft Flat Light", desc: "Flat, even softbox lighting, clinical high-key detail.", bg: "Bright solid white backdrop." },
+            { id: 42, type: "Golden Hour", desc: "Warm sunset backlight causing a rim-light effect on the hair.", bg: "Blurred outdoor park at sunset." },
+            { id: 43, type: "Cinematic Noir", desc: "Dark moody lighting, illuminated only by a dim screen glow.", bg: "Dark, moody room, out of focus." },
+            { id: 44, type: "Casual Wardrobe", desc: "Wearing a simple, plain casual white t-shirt.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 45, type: "Formal Wardrobe", desc: "Wearing a sleek, modern white pantsuit.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 46, type: "Hair Tied Back", desc: "Hair tied back tightly, completely exposing the jawline and ears.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 47, type: "Glasses / Accessories", desc: "Wearing professional wire-rimmed reading glasses.", bg: "Solid, neutral medium-grey seamless studio backdrop." },
+            { id: 48, type: "The Masterpiece", desc: "Cinematic masterpiece portrait, standard attire, perfectly composed.", bg: "Rich, out-of-focus professional newsroom." }
+        ];
+
+        // --- Safe Initialization Framework ---
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Step 1: Pre-populate synchronous UI with fallback data so DOM doesn't freeze
+            personas = JSON.parse(JSON.stringify(seedPersonas));
+            populatePersonas();
+            populateSidebar();
+            populateGrid();
+
+            // Step 2: Yield execution to allow paint, then fetch heavy localforage data
+            setTimeout(async () => {
+                try {
+                    const cachedPersonas = await localforage.getItem('customPersonasArray');
+                    if (cachedPersonas && Array.isArray(cachedPersonas) && cachedPersonas.length > 0) {
+                        personas = cachedPersonas;
+                        populatePersonas();
+                    }
+
+                    const cachedImages = await localforage.getItem('generatedImages');
+                    if (cachedImages) generatedImages = cachedImages;
+                    else personas.forEach((p, i) => { generatedImages[i] = {}; });
+
+                    const cachedPrompts = await localforage.getItem('customPrompts');
+                    if (cachedPrompts) customPrompts = cachedPrompts;
+
+                    const cachedRefs = await localforage.getItem('referenceImages');
+                    if (cachedRefs) referenceImages = cachedRefs;
+
+                } catch (e) {
+                    console.error("Cache load failed, continuing with defaults:", e);
+                    personas.forEach((p, i) => { generatedImages[i] = {}; });
+                }
+
+                // Sync current state without massive grid recalculations
+                handlePersonaSwitch();
+
+            }, 100);
+        });
+
+        // --- UI View Switching ---
+        function switchView(mode) {
+            currentViewMode = mode;
+            const btnSingle = document.getElementById('btnViewSingle');
+            const btnGrid = document.getElementById('btnViewGrid');
+            const viewSingle = document.getElementById('singleView');
+            const viewGrid = document.getElementById('gridView');
+            const sidebarList = document.getElementById('sidebarListContainer');
+
+            if (mode === 'single') {
+                btnSingle.classList.replace('text-slate-400', 'text-white');
+                btnSingle.classList.replace('hover:text-white', 'bg-slate-600');
+                btnSingle.classList.add('shadow-sm');
+                btnGrid.classList.replace('text-white', 'text-slate-400');
+                btnGrid.classList.replace('bg-slate-600', 'hover:text-white');
+                btnGrid.classList.remove('shadow-sm');
+
+                viewSingle.classList.remove('hidden'); viewSingle.classList.add('flex');
+                viewGrid.classList.add('hidden'); viewGrid.classList.remove('flex');
+                sidebarList.classList.remove('hidden');
+
+                selectScenario(currentScenarioIndex);
+            } else {
+                btnGrid.classList.replace('text-slate-400', 'text-white');
+                btnGrid.classList.replace('hover:text-white', 'bg-slate-600');
+                btnGrid.classList.add('shadow-sm');
+                btnSingle.classList.replace('text-white', 'text-slate-400');
+                btnSingle.classList.replace('bg-slate-600', 'hover:text-white');
+                btnSingle.classList.remove('shadow-sm');
+
+                viewGrid.classList.remove('hidden'); viewGrid.classList.add('flex');
+                viewSingle.classList.add('hidden'); viewSingle.classList.remove('flex');
+                sidebarList.classList.add('hidden');
+
+                renderGridContent();
+            }
+        }
+
+        // --- Persona & Reference Logic ---
+        function handlePersonaSwitch() {
+            const select = document.getElementById("personaSelect");
+            if (!select || !select.value) return;
+
+            const pIndex = select.value;
+            if (!personas[pIndex]) return;
+
+            const pName = personas[pIndex].name;
+            document.getElementById("activePersonaRefLabel").textContent = pName;
+
+            if (referenceImages[pIndex]) {
+                const dataUrl = `data:${referenceImages[pIndex].mimeType};base64,${referenceImages[pIndex].base64}`;
+                const thumb = document.getElementById("refImageThumbnail");
+                thumb.style.backgroundImage = `url(${dataUrl})`;
+                thumb.classList.remove("hidden");
+                document.getElementById("clearRefBtn").classList.remove("hidden");
+            } else {
+                document.getElementById("refImageThumbnail").classList.add("hidden");
+                document.getElementById("clearRefBtn").classList.add("hidden");
+            }
+
+            updateCompletionCounter();
+            selectScenario(currentScenarioIndex);
+            if (currentViewMode === 'grid') renderGridContent();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const pIndex = document.getElementById("personaSelect").value;
+            const pName = personas[pIndex].name;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const dataUrl = e.target.result;
+                const mimeType = dataUrl.match(/data:(.*?);/)[1];
+                const base64 = dataUrl.split(',')[1];
+                referenceImages[pIndex] = { mimeType, base64 };
+                await localforage.setItem('referenceImages', referenceImages);
+
+                const thumb = document.getElementById("refImageThumbnail");
+                thumb.style.backgroundImage = `url(${dataUrl})`;
+                thumb.classList.remove("hidden");
+                document.getElementById("clearRefBtn").classList.remove("hidden");
+                event.target.value = '';
+                showToast(`Reference saved for ${pName}! Clone Mode Enabled.`);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function clearReferenceImage() {
+            const pIndex = document.getElementById("personaSelect").value;
+            const pName = personas[pIndex].name;
+            if (referenceImages[pIndex]) {
+                delete referenceImages[pIndex];
+                await localforage.setItem('referenceImages', referenceImages);
+            }
+            document.getElementById("refImageThumbnail").classList.add("hidden");
+            document.getElementById("clearRefBtn").classList.add("hidden");
+            showToast(`Reference Image cleared for ${pName}.`);
+        }
+
+        // --- Prompt Engine ---
+        function getDefaultPrompt(sIndex, pIndex) {
+            const scenario = scenarios[sIndex];
+            const persona = personas[pIndex];
+            let attire = persona.attire;
+            if (scenario.desc.toLowerCase().includes('wardrobe') || scenario.desc.toLowerCase().includes('glasses')) {
+                attire = "Attire explicitly overridden: " + scenario.desc;
+            }
+
+            return `A raw, candid, unretouched DSLR photograph of ${persona.name}. \n` +
+                `Age: ${persona.age}. Build: ${persona.body}. \n` +
+                `Identifying Details: ${persona.details}. \n` +
+                `Base Attire: ${attire} \n` +
+                `Action/Pose: ${scenario.desc} \n` +
+                `BACKGROUND ENVIRONMENT (STRICT): ${scenario.bg} \n` +
+                `Style: True photographic realism, shot on 85mm lens, highly detailed natural skin texture, professional lighting, no CGI, photorealistic portrait.`;
+        }
+
+        function getActivePrompt(sIndex, pIndex) {
+            const cacheKey = `${pIndex}-${sIndex}`;
+            if (customPrompts[cacheKey]) return customPrompts[cacheKey];
+            return getDefaultPrompt(sIndex, pIndex);
+        }
+
+        async function savePromptValue(sIndex, pIndex, newValue) {
+            const cacheKey = `${pIndex}-${sIndex}`;
+            customPrompts[cacheKey] = newValue;
+            await localforage.setItem('customPrompts', customPrompts);
+
+            if (currentViewMode === 'grid' && currentScenarioIndex === sIndex) {
+                document.getElementById("currentPromptText").value = newValue;
+            } else if (currentViewMode === 'single') {
+                const gridEditor = document.getElementById(`grid-prompt-${sIndex}`);
+                if (gridEditor) gridEditor.value = newValue;
+            }
+        }
+
+        function saveCurrentPrompt() {
+            const text = document.getElementById("currentPromptText").value;
+            const pIndex = document.getElementById("personaSelect").value;
+            savePromptValue(currentScenarioIndex, pIndex, text);
+            showToast("Custom prompt saved!");
+        }
+
+        async function resetCurrentPrompt() {
+            const pIndex = document.getElementById("personaSelect").value;
+            await resetPromptSpecific(currentScenarioIndex, pIndex);
+        }
+
+        async function resetPromptSpecific(sIndex, pIndex) {
+            const cacheKey = `${pIndex}-${sIndex}`;
+            if (customPrompts[cacheKey]) {
+                delete customPrompts[cacheKey];
+                await localforage.setItem('customPrompts', customPrompts);
+
+                const defPrompt = getDefaultPrompt(sIndex, pIndex);
+                if (currentScenarioIndex === sIndex) document.getElementById("currentPromptText").value = defPrompt;
+                const gridEditor = document.getElementById(`grid-prompt-${sIndex}`);
+                if (gridEditor) gridEditor.value = defPrompt;
+                showToast("Prompt reset to default.");
+            }
+        }
+
+        function getFinalPromptString(sIndex, pIndex) {
+            let prompt = getActivePrompt(sIndex, pIndex);
+            if (referenceImages[pIndex]) {
+                prompt = `[CLONE IDENTITY DIRECTIVE] Reproduce the EXACT PERSON from the attached reference image in the scenario described below. Maintain their precise facial structure, skin texture, moles, eye color, and hair style.\n\n` + prompt;
+            }
+            return prompt;
+        }
+
+        // --- UI Population (DOM Generation) ---
+        function populatePersonas() {
+            const select = document.getElementById("personaSelect");
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = "";
+            personas.forEach((p, index) => {
+                select.appendChild(new Option(p.name, index));
+            });
+            if (currentVal && currentVal < personas.length) select.value = currentVal;
+        }
+
+        function populateSidebar() {
+            const list = document.getElementById("scenarioList");
+            if (!list) return;
+            let htmlStr = "";
+            scenarios.forEach((s, index) => {
+                htmlStr += `
+                <button id="sidebar-btn-${index}" class="w-full text-left p-2 rounded-md border border-transparent hover:border-slate-600 hover:bg-slate-700/50 transition-colors flex justify-between items-center group item-btn" onclick="selectScenarioAndScroll(${index})">
+                    <div class="flex flex-col gap-0.5 w-[85%]">
+                        <span class="text-[10px] font-bold text-emerald-500">Image ${s.id}</span>
+                        <span class="text-xs font-medium text-slate-200 truncate pr-2" title="${s.type}">${s.type}</span>
+                    </div>
+                    <div id="check-${index}" class="hidden text-emerald-400 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                    </div>
+                </button>
+            `;
+            });
+            list.innerHTML = htmlStr;
+        }
+
+        function selectScenarioAndScroll(index) {
+            selectScenario(index);
+            if (currentViewMode === 'grid') {
+                const gridCard = document.getElementById(`grid-card-${index}`);
+                if (gridCard) gridCard.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
+        function populateGrid() {
+            const container = document.getElementById("gridContainer");
+            if (!container) return;
+
+            let htmlStr = "";
+            scenarios.forEach((s, index) => {
+                htmlStr += `
+                <div id="grid-card-${index}" class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm flex flex-col transition-all hover:border-slate-500">
+                    <div class="p-3 border-b border-slate-700 bg-slate-800/80 flex justify-between items-center">
+                        <div class="truncate pr-2">
+                            <span class="text-[10px] font-bold text-emerald-500 block">IMG ${s.id}</span>
+                            <span class="text-sm font-semibold text-slate-200 truncate" title="${s.type}">${s.type}</span>
+                        </div>
+                        <button onclick="triggerGenerationGrid(${index})" id="grid-gen-btn-${index}" class="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded transition-colors" title="Generate">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>
+                    
+                    <div id="grid-img-container-${index}" class="h-56 md:h-64 bg-slate-900 relative flex items-center justify-center border-b border-slate-700 p-2"></div>
+
+                    <div class="bg-slate-800 flex-1 flex flex-col">
+                        <div class="p-3 flex-1 flex flex-col">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[9px] text-slate-400">Edit Prompt</span>
+                                <button onclick="resetPromptSpecific(${index}, document.getElementById('personaSelect').value)" class="text-[10px] text-slate-400 hover:text-emerald-400 transition-colors underline">Reset</button>
+                            </div>
+                            <textarea id="grid-prompt-${index}" onchange="savePromptValue(${index}, document.getElementById('personaSelect').value, this.value)" class="w-full bg-slate-900/50 text-slate-300 border border-slate-700 rounded p-2 text-xs font-mono flex-1 min-h-[70px] focus:ring-1 focus:ring-emerald-500 outline-none custom-scrollbar"></textarea>
+                        </div>
+                        
+                        <div id="grid-edit-panel-${index}" class="p-3 border-t border-slate-700 bg-slate-800/50 hidden">
+                            <span class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider block mb-1">Edit Image (Inpaint)</span>
+                            <div class="flex gap-1.5">
+                                <input type="text" id="grid-edit-input-${index}" placeholder="e.g. fix hand" class="flex-1 bg-slate-900 border border-slate-600 text-slate-200 text-[11px] rounded px-2 py-1 focus:outline-none focus:border-indigo-500">
+                                <button onclick="triggerEditGrid(${index})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded font-medium text-[11px] transition-colors shrink-0">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            });
+            container.innerHTML = htmlStr;
+        }
+
+        // --- Fast, Non-Blocking Grid Renderer ---
+        function renderGridContent() {
+            const select = document.getElementById("personaSelect");
+            if (!select) return;
+            const pIndex = select.value;
+            if (!personas[pIndex]) return;
+
+            scenarios.forEach((s, index) => {
+                const promptArea = document.getElementById(`grid-prompt-${index}`);
+                if (promptArea) promptArea.value = getActivePrompt(index, pIndex);
+
+                const imgContainer = document.getElementById(`grid-img-container-${index}`);
+                const editPanel = document.getElementById(`grid-edit-panel-${index}`);
+                const base64Src = generatedImages[pIndex]?.[index];
+                const cacheKey = `${pIndex}-${index}`;
+
+                if (!imgContainer || !editPanel) return;
+
+                // Direct rendering to avoid Blob creation blocking the main thread
+                if (base64Src) {
+                    editPanel.classList.remove("hidden");
+                    imgContainer.innerHTML = `
+                    <img src="${base64Src}" class="max-h-full max-w-full object-contain rounded drop-shadow-lg pointer-events-auto" style="-webkit-touch-callout: default;">
+                    <button onclick="downloadSingleHighRes(${pIndex}, ${index})" class="absolute bottom-2 right-2 bg-slate-800/90 hover:bg-slate-700 p-1.5 rounded text-emerald-400 transition-colors backdrop-blur-sm border border-slate-600 shadow-lg group" title="Download High-Res">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:scale-110 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                `;
+                } else if (activeGenerations.has(cacheKey)) {
+                    editPanel.classList.add("hidden");
+                    imgContainer.innerHTML = `
+                    <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                        <div class="loader-sm mb-2"></div>
+                        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Generating...</span>
+                    </div>
+                `;
+                } else {
+                    editPanel.classList.add("hidden");
+                    imgContainer.innerHTML = `
+                    <div class="text-slate-600 flex flex-col items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-[10px] font-medium uppercase tracking-wider">Awaiting</span>
+                    </div>
+                `;
+                }
+
+                const btnGrid = document.getElementById(`grid-gen-btn-${index}`);
+                if (btnGrid) {
+                    if (activeGenerations.has(cacheKey) || isGeneratingAll) {
+                        btnGrid.disabled = true;
+                        btnGrid.classList.replace('bg-emerald-600', 'bg-slate-600');
+                    } else {
+                        btnGrid.disabled = false;
+                        btnGrid.classList.replace('bg-slate-600', 'bg-emerald-600');
+                    }
+                }
+            });
+        }
+
+        function renderSingleImageUI(sIndex, pIndex) {
+            const imgContainer = document.getElementById("imageContainer");
+            if (!imgContainer) return;
+            const personaName = personas[pIndex].name;
+            const sType = scenarios[sIndex].type;
+            const base64Src = generatedImages[pIndex]?.[sIndex];
+
+            if (base64Src) {
+                const cleanType = sType.replace(/[^a-zA-Z0-9]/g, '_');
+                const fileName = `${personaName}.${cleanType}.png`;
+
+                // Direct rendering without Blob building to protect CPU
+                imgContainer.innerHTML = `
+                <img src="${base64Src}" alt="${fileName}" class="max-h-[350px] md:max-h-[420px] w-auto object-contain rounded-lg shadow-2xl border border-slate-600 pointer-events-auto select-none" style="-webkit-touch-callout: default;">
+                <div class="flex flex-col items-center mt-5 gap-1">
+                    <button onclick="downloadSingleHighRes(${pIndex}, ${sIndex})" class="bg-slate-700 hover:bg-slate-600 text-emerald-400 hover:text-emerald-300 py-2 px-6 rounded-lg font-medium shadow flex items-center gap-2 text-sm transition-colors border border-slate-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        Download High-Res
+                    </button>
+                </div>
+            `;
+            } else {
+                imgContainer.innerHTML = `
+                <div class="text-slate-500 flex flex-col items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="text-sm font-medium uppercase tracking-wider">Awaiting Generation</span>
+                </div>
+            `;
+            }
+        }
+
+        function updateLoadingState() {
+            const select = document.getElementById("personaSelect");
+            if (!select) return;
+            const pIndex = select.value;
+            const cacheKey = `${pIndex}-${currentScenarioIndex}`;
+            const loadSingle = document.getElementById("loadingStateSingle");
+            const btnSingle = document.getElementById("generateBtnSingle");
+
+            if (activeGenerations.has(cacheKey)) {
+                if (loadSingle) loadSingle.classList.remove("hidden");
+                if (btnSingle) btnSingle.disabled = true;
+            } else {
+                if (loadSingle) loadSingle.classList.add("hidden");
+                if (btnSingle) btnSingle.disabled = isGeneratingAll;
+            }
+        }
+
+        function updateCompletionCounter() {
+            const select = document.getElementById("personaSelect");
+            if (!select) return;
+            const pIndex = select.value;
+            if (!generatedImages[pIndex]) generatedImages[pIndex] = {};
+
+            const count = Object.keys(generatedImages[pIndex]).length;
+            const compCtr = document.getElementById("completionCounter");
+            const gridCompCtr = document.getElementById("gridCompletionCounter");
+            if (compCtr) compCtr.textContent = `${count}/${scenarios.length}`;
+            if (gridCompCtr) gridCompCtr.textContent = `${count}/${scenarios.length}`;
+
+            const zipBtn = document.getElementById("downloadZipBtn");
+            if (zipBtn) {
+                if (count > 0) zipBtn.classList.remove("hidden");
+                else zipBtn.classList.add("hidden");
+            }
+
+            scenarios.forEach((s, index) => {
+                const check = document.getElementById(`check-${index}`);
+                if (check) {
+                    if (generatedImages[pIndex][index]) check.classList.remove("hidden");
+                    else check.classList.add("hidden");
+                }
+            });
+        }
+
+        function selectScenario(index) {
+            currentScenarioIndex = index;
+            const s = scenarios[index];
+            const select = document.getElementById("personaSelect");
+            if (!select) return;
+            const personaIndex = select.value;
+
+            document.querySelectorAll('.item-btn').forEach((btn, i) => {
+                if (i === index) {
+                    btn.classList.add('bg-slate-700', 'border-slate-500');
+                    btn.classList.remove('border-transparent');
+                    if (!isGeneratingAll && currentViewMode === 'single') btn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                } else {
+                    btn.classList.remove('bg-slate-700', 'border-slate-500');
+                    btn.classList.add('border-transparent');
+                }
+            });
+
+            const title = document.getElementById("currentScenarioTitle");
+            const badge = document.getElementById("currentScenarioBadge");
+            const desc = document.getElementById("currentScenarioDesc");
+            const promptText = document.getElementById("currentPromptText");
+            const btnSingle = document.getElementById("generateBtnSingle");
+
+            if (title) title.textContent = s.type;
+            if (badge) badge.textContent = `Image ${s.id}/${scenarios.length}`;
+            if (desc) desc.textContent = s.desc;
+            if (promptText) promptText.value = getActivePrompt(index, personaIndex);
+            if (btnSingle) btnSingle.disabled = false;
+
+            renderSingleImageUI(index, personaIndex);
+            updateLoadingState();
+
+            const editPanel = document.getElementById("editControlsSingle");
+            if (editPanel) {
+                if (generatedImages[personaIndex]?.[index]) {
+                    editPanel.classList.remove("hidden");
+                    document.getElementById("editInstructionSingle").value = "";
+                } else {
+                    editPanel.classList.add("hidden");
+                }
+            }
+        }
+
+        // --- Bulk Generation ---
+        async function toggleGenerateAll() {
+            const btnSingle = document.getElementById("generateAllBtnSingle");
+            const btnGrid = document.getElementById("generateAllBtnGrid");
+            const progContainers = document.querySelectorAll("#batchProgressContainer");
+            const progBars = document.querySelectorAll("#batchProgressBar");
+            const progTexts = document.querySelectorAll("#batchProgressText");
+
+            if (isGeneratingAll) {
+                isGeneratingAll = false;
+                if (btnSingle) btnSingle.innerHTML = `Stopping...`;
+                if (btnGrid) btnGrid.innerHTML = `Stopping...`;
+                showToast("Stopping batch generation...", true);
+                return;
+            }
+
+            isGeneratingAll = true;
+            const stopHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Stop Generation`;
+
+            if (btnSingle) { btnSingle.innerHTML = stopHTML; btnSingle.classList.replace("bg-indigo-600", "bg-red-600"); btnSingle.classList.replace("hover:bg-indigo-500", "hover:bg-red-500"); document.getElementById("generateBtnSingle").disabled = true; }
+            if (btnGrid) { btnGrid.innerHTML = stopHTML; btnGrid.classList.replace("bg-indigo-600", "bg-red-600"); btnGrid.classList.replace("hover:bg-indigo-500", "hover:bg-red-500"); }
+
+            updateLoadingState();
+            renderGridContent();
+            progContainers.forEach(c => c.classList.remove("hidden"));
+
+            const pIndex = document.getElementById("personaSelect").value;
+            let generatedCount = Object.keys(generatedImages[pIndex] || {}).length;
+
+            for (let i = 0; i < scenarios.length; i++) {
+                if (!isGeneratingAll) break;
+
+                if (currentViewMode === 'single') selectScenario(i);
+
+                const percent = Math.round((i / scenarios.length) * 100);
+                progBars.forEach(b => b.style.width = `${percent}%`);
+                progTexts.forEach(t => t.textContent = `${percent}%`);
+
+                if (!generatedImages[pIndex]?.[i]) {
+                    await executeGeneration(i, pIndex);
+                    generatedCount++;
+
+                    if (isGeneratingAll && i < scenarios.length - 1) {
+                        if (currentViewMode === 'single') {
+                            const loadingSub = document.getElementById("loadingSubtitleSingle");
+                            if (loadingSub) loadingSub.innerHTML = `<span class="text-indigo-400 font-bold">Waiting 5s (API limit)...</span>`;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                    }
+                }
+            }
+
+            isGeneratingAll = false;
+            progBars.forEach(b => b.style.width = `100%`); progTexts.forEach(t => t.textContent = `100%`);
+            setTimeout(() => progContainers.forEach(c => c.classList.add("hidden")), 2000);
+
+            const genAllHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg> Auto-Generate All 48`;
+            if (btnSingle) { btnSingle.innerHTML = genAllHTML; btnSingle.classList.replace("bg-red-600", "bg-indigo-600"); btnSingle.classList.replace("hover:bg-red-500", "hover:bg-indigo-500"); document.getElementById("generateBtnSingle").disabled = false; }
+            if (btnGrid) { btnGrid.innerHTML = genAllHTML; btnGrid.classList.replace("bg-red-600", "bg-indigo-600"); btnGrid.classList.replace("hover:bg-red-500", "hover:bg-indigo-500"); }
+
+            updateLoadingState();
+            renderGridContent();
+
+            if (generatedCount >= scenarios.length) showToast("🎉 Dataset Complete!");
+        }
+
+        // --- Core API Executor ---
+        function triggerGenerationSingle() { executeGeneration(currentScenarioIndex, document.getElementById("personaSelect").value); }
+        function triggerEditSingle() {
+            const instruction = document.getElementById("editInstructionSingle").value;
+            if (!instruction.trim()) return showToast("Please enter an edit instruction.", true);
+            executeGeneration(currentScenarioIndex, document.getElementById("personaSelect").value, instruction);
+        }
+        function triggerGenerationGrid(sIndex) { currentScenarioIndex = sIndex; executeGeneration(sIndex, document.getElementById("personaSelect").value); }
+        function triggerEditGrid(sIndex) {
+            const instruction = document.getElementById(`grid-edit-input-${sIndex}`).value;
+            if (!instruction.trim()) return showToast("Please enter an edit instruction.", true);
+            currentScenarioIndex = sIndex;
+            executeGeneration(sIndex, document.getElementById("personaSelect").value, instruction);
+        }
+
+        async function executeGeneration(sIndex, pIndex, editInstruction = null) {
+            let prompt = getFinalPromptString(sIndex, pIndex);
+            if (editInstruction) prompt = `EDIT INSTRUCTION: ${editInstruction}\n\nORIGINAL CONTEXT: ` + prompt;
+
+            const cacheKey = `${pIndex}-${sIndex}`;
+            activeGenerations.add(cacheKey);
+
+            if (currentScenarioIndex === sIndex) {
+                const subtitle = document.getElementById("loadingSubtitleSingle");
+                if (subtitle) subtitle.textContent = editInstruction ? "Editing via API..." : "Connecting to API...";
+            }
+            updateLoadingState();
+            renderGridContent();
+
+            try {
+                let refBase64ToUse = referenceImages[pIndex] ? referenceImages[pIndex].base64 : null;
+                let refMimeToUse = referenceImages[pIndex] ? referenceImages[pIndex].mimeType : null;
+
+                if (editInstruction && generatedImages[pIndex][sIndex]) {
+                    const existingData = generatedImages[pIndex][sIndex];
+                    refMimeToUse = existingData.match(/data:(.*?);/)[1];
+                    refBase64ToUse = existingData.split(',')[1];
+                }
+
+                const base64Image = await fetchWithRetry(prompt, sIndex, refBase64ToUse, refMimeToUse);
+
+                if (!generatedImages[pIndex]) generatedImages[pIndex] = {};
+                generatedImages[pIndex][sIndex] = base64Image;
+
+                await localforage.setItem('generatedImages', generatedImages);
+
+                if (currentScenarioIndex === sIndex) {
+                    renderSingleImageUI(sIndex, pIndex);
+                    const editPanel = document.getElementById("editControlsSingle");
+                    if (editPanel) editPanel.classList.remove("hidden");
+                    const editInput = document.getElementById("editInstructionSingle");
+                    if (editInput) editInput.value = "";
+                }
+                activeGenerations.delete(cacheKey);
+                renderGridContent();
+                updateCompletionCounter();
+
+                if (!isGeneratingAll) showToast(editInstruction ? `Image Edited Successfully!` : `Image Generated!`);
+            } catch (error) {
+                console.error("Generation failed:", error);
+                showToast("Failed to generate/edit. See console.", true);
+                activeGenerations.delete(cacheKey);
+                renderGridContent();
+                if (isGeneratingAll) toggleGenerateAll();
+            } finally {
+                activeGenerations.delete(cacheKey);
+                updateLoadingState();
+                renderGridContent();
+            }
+        }
+
+        async function fetchWithRetry(prompt, sIndex, overrideBase64 = null, overrideMime = null, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            let endpoint, payload;
+
+            if (overrideBase64) {
+                endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+                payload = { contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: overrideMime, data: overrideBase64 } }] }], generationConfig: { responseModalities: ["IMAGE"] } };
+            } else {
+                endpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                payload = { instances: { prompt: prompt }, parameters: { sampleCount: 1 } };
+            }
+
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const result = await response.json();
+
+                    if (overrideBase64) {
+                        const base64Out = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                        if (base64Out) return `data:image/jpeg;base64,${base64Out}`;
+                        else throw new Error("Invalid format from Gemini");
+                    } else {
+                        if (result.predictions && result.predictions[0] && result.predictions[0].bytesBase64Encoded) return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        else throw new Error("Invalid Imagen API structure");
+                    }
+                } catch (error) {
+                    if (i === retries) throw error;
+                    if (currentScenarioIndex === sIndex) {
+                        const loadingSub = document.getElementById("loadingSubtitleSingle");
+                        if (loadingSub) loadingSub.textContent = `Rate limited. Retrying ${i + 1}/${retries}...`;
+                    }
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        async function clearAllCache() {
+            if (confirm("DANGER: Wipe ALL generated images, edits, uploaded references, and custom JSON personas from storage?")) {
+                await localforage.clear();
+                personas = JSON.parse(JSON.stringify(seedPersonas));
+                personas.forEach((p, i) => { generatedImages[i] = {}; });
+                customPrompts = {}; referenceImages = {}; activeGenerations.clear();
+
+                document.getElementById("refImageInput").value = "";
+                document.getElementById("refImageThumbnail").classList.add("hidden");
+                document.getElementById("clearRefBtn").classList.add("hidden");
+
+                populatePersonas();
+                selectScenario(0);
+                renderGridContent();
+                updateCompletionCounter();
+                showToast("Database fully wiped. Factory reset complete.");
+            }
+        }
+
+        // --- High-Res Off-Screen Download Engine (Asynchronous to prevent freeze) ---
+        async function downloadSingleHighRes(pIndex, sIndex) {
+            showToast("Preparing High-Res Image...");
+
+            const base64Src = generatedImages[pIndex][sIndex];
+            const personaName = personas[pIndex].name;
+            const sType = scenarios[sIndex].type;
+            const cleanType = sType.replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${personaName}.${cleanType}.png`;
+            const mimeType = base64Src.match(/data:(.*?);/)[1] || 'image/png';
+
+            const processedBase64Data = await processImageForZip(base64Src, mimeType);
+
+            const byteCharacters = atob(processedBase64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+            const blob = new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function processImageForZip(base64Src, mimeType) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const processedDataUrl = canvas.toDataURL(mimeType, 1.0);
+                    resolve(processedDataUrl.split(',')[1]);
+                };
+                img.src = base64Src;
+            });
+        }
+
+        async function exportZip() {
+            const pIndex = document.getElementById("personaSelect").value;
+            const personaName = personas[pIndex].name;
+            const currentGen = generatedImages[pIndex];
+            const count = Object.keys(currentGen || {}).length;
+
+            if (count === 0) return;
+
+            showToast("Processing High-Res ZIP... Please wait.");
+
+            const zipBtn = document.getElementById("downloadZipBtn");
+            if (zipBtn) {
+                zipBtn.disabled = true;
+                zipBtn.innerHTML = `<div class="loader-sm border-white"></div> Processing...`;
+            }
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder(`${personaName}_V11_Dataset`);
+                let mappingJson = {};
+
+                const entries = Object.entries(currentGen);
+                for (let i = 0; i < entries.length; i++) {
+                    const [sIndex, base64Src] = entries[i];
+                    const cleanType = scenarios[sIndex].type.replace(/[^a-zA-Z0-9]/g, '_');
+                    const fileName = `${personaName}.${cleanType}.png`;
+                    const mimeType = base64Src.match(/data:(.*?);/)[1] || 'image/png';
+
+                    const processedBase64Data = await processImageForZip(base64Src, mimeType);
+
+                    folder.file(fileName, processedBase64Data, { base64: true });
+                    mappingJson[scenarios[sIndex].type] = {
+                        file: fileName,
+                        promptUsed: getActivePrompt(sIndex, pIndex)
+                    };
+                }
+
+                folder.file(`${personaName}_dataset_map.json`, JSON.stringify({ [personaName]: mappingJson }, null, 2));
+
+                const content = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(content);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${personaName}_V11_LoRA_Dataset_${count}_images.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("High-Res ZIP Downloaded Successfully!");
+            } catch (e) {
+                console.error(e);
+                showToast("Error generating ZIP.", true);
+            } finally {
+                if (zipBtn) {
+                    zipBtn.disabled = false;
+                    zipBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    Export High-Res ZIP
+                `;
+                }
+            }
+        }
+
+        // --- Editor Triggers ---
+        function openPersonaEditor() {
+            const select = document.getElementById("editPersonaSelect");
+            select.innerHTML = "";
+            personas.forEach((p, i) => { select.appendChild(new Option(p.name, i)); });
+            const currentIndex = document.getElementById("personaSelect").value;
+            select.value = currentIndex;
+            loadPersonaIntoEditor();
+            document.getElementById("personaModal").classList.remove("modal-hidden");
+        }
+
+        function closePersonaEditor() { document.getElementById("personaModal").classList.add("modal-hidden"); }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toastMsg");
+            if (toastMsg) toastMsg.textContent = msg;
+            if (toast) {
+                toast.className = `fixed top-20 right-4 px-4 py-3 text-white rounded-md shadow-2xl transition-all duration-300 z-[100] flex items-center gap-2 font-medium ${isError ? 'bg-red-500' : 'bg-emerald-500'}`;
+                toast.classList.remove("hidden");
+                setTimeout(() => toast.classList.add("hidden"), 3000);
+            }
+        }
+    </script>
+</body>
+
+</html>

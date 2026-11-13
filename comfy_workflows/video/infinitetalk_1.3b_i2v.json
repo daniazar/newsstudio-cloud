@@ -1,0 +1,140 @@
+{
+  "1": {
+    "inputs": {
+      "model_name": "Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors",
+      "weight_dtype": "fp8_e4m3fn",
+      "compute_dtype": "default",
+      "patch_cublaslinear": false,
+      "sage_attention": "disabled",
+      "enable_fp16_accumulation": false
+    },
+    "class_type": "DiffusionModelLoaderKJ",
+    "_meta": { "title": "Load Wan 2.1 I2V Model" }
+  },
+  "2": {
+    "inputs": {
+      "audio_encoder_name": "wav2vec2-chinese-base_fp16.safetensors"
+    },
+    "class_type": "AudioEncoderLoader",
+    "_meta": { "title": "Load Audio Encoder" }
+  },
+  "3": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load Text Encoder" }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" }
+  },
+  "5": {
+    "inputs": {
+      "text": "a realistic news presenter speaking naturally live in studio",
+      "clip": ["3", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "6": {
+    "inputs": {
+      "text": "blurry, low quality, distorted face, unnatural movement",
+      "clip": ["3", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" }
+  },
+  "7": {
+    "inputs": {
+      "image": "ruby.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Avatar Image" }
+  },
+  "8": {
+    "inputs": {
+      "audio": "input_audio.wav",
+      "upload": "audio"
+    },
+    "class_type": "LoadAudio",
+    "_meta": { "title": "Load Voice Audio" }
+  },
+  "9": {
+    "inputs": {
+      "audio_encoder": ["2", 0],
+      "audio": ["8", 0]
+    },
+    "class_type": "AudioEncoderEncode",
+    "_meta": { "title": "Encode Audio Features" }
+  },
+  "10": {
+    "inputs": {
+      "name": "wan2.1_infiniteTalk_multi_fp16.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": { "title": "Load Model Patch" }
+  },
+  "11": {
+    "inputs": {
+      "mode": "single_speaker",
+      "model": ["1", 0],
+      "model_patch": ["10", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "vae": ["4", 0],
+      "width": 832,
+      "height": 480,
+      "length": 81,
+      "audio_encoder_output_1": ["9", 0],
+      "motion_frame_count": 9,
+      "audio_scale": 1.0,
+      "start_image": ["7", 0]
+    },
+    "class_type": "WanInfiniteTalkToVideo",
+    "_meta": { "title": "Wan InfiniteTalk To Video" }
+  },
+  "12": {
+    "inputs": {
+      "model": ["11", 0],
+      "positive": ["11", 1],
+      "negative": ["11", 2],
+      "latent_image": ["11", 3],
+      "seed": 42,
+      "steps": 20,
+      "cfg": 6.0,
+      "sampler_name": "uni_pc",
+      "scheduler": "simple",
+      "denoise": 1.0
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "13": {
+    "inputs": {
+      "samples": ["12", 0],
+      "vae": ["4", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "Decode Video" }
+  },
+  "14": {
+    "inputs": {
+      "images": ["13", 0],
+      "audio": ["8", 0],
+      "frame_rate": 25.0,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true,
+      "filename_prefix": "infinitetalk_result",
+      "format": "video/nvenc_h264-mp4"
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": { "title": "Save Video" }
+  }
+}

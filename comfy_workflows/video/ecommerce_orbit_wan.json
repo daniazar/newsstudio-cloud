@@ -1,0 +1,126 @@
+{
+  "1": {
+    "inputs": {
+      "model": "Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors",
+      "base_precision": "bf16",
+      "quantization": "fp8_e4m3fn_scaled",
+      "load_device": "offload_device"
+    },
+    "class_type": "WanVideoModelLoader",
+    "_meta": { "title": "WanVideo Model Loader (14B I2V)" }
+  },
+  "2": {
+    "inputs": {
+      "model_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "precision": "bf16"
+    },
+    "class_type": "LoadWanVideoT5TextEncoder",
+    "_meta": { "title": "Load T5 Text Encoder" }
+  },
+  "3": {
+    "inputs": {
+      "model_name": "wan2.1_vae.safetensors",
+      "precision": "bf16"
+    },
+    "class_type": "WanVideoVAELoader",
+    "_meta": { "title": "Load Color VAE" }
+  },
+  "4": {
+    "inputs": {
+      "clip_name": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": { "title": "Load CLIP Vision" }
+  },
+  "5": {
+    "inputs": {
+      "image": "product_packshot.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Product Packshot" }
+  },
+  "6": {
+    "inputs": {
+      "clip_vision": ["4", 0],
+      "image_1": ["5", 0],
+      "strength_1": 1.0,
+      "strength_2": 1.0,
+      "crop": "center",
+      "combine_embeds": "average",
+      "force_offload": true
+    },
+    "class_type": "WanVideoClipVisionEncode",
+    "_meta": { "title": "CLIP Vision Encode" }
+  },
+  "7": {
+    "inputs": {
+      "positive_prompt": "smooth cinematic 360 camera orbit around floating product, studio rim lighting, luxury commercial presentation, slow turntable rotation, seamless reflections, 8k uhd, photorealistic, pristine product geometry, clean black studio backdrop",
+      "negative_prompt": "shaky camera, jitter, warping, distortion, morphing, sudden cuts, changing geometry, low quality, blurry, text, watermark, human hands",
+      "t5": ["2", 0],
+      "force_offload": true
+    },
+    "class_type": "WanVideoTextEncode",
+    "_meta": { "title": "Commercial Orbit Text Prompt" }
+  },
+  "8": {
+    "inputs": {
+      "start_image": ["5", 0],
+      "vae": ["3", 0],
+      "clip_embeds": ["6", 0],
+      "width": 480,
+      "height": 832,
+      "num_frames": 75,
+      "noise_aug_strength": 0.0,
+      "start_latent_strength": 1.0,
+      "end_latent_strength": 1.0,
+      "fun_or_fl2v_model": false,
+      "force_offload": true
+    },
+    "class_type": "WanVideoImageToVideoEncode",
+    "_meta": { "title": "I2V Encode (75 Frames / 3s)" }
+  },
+  "9": {
+    "inputs": {
+      "model": ["1", 0],
+      "image_embeds": ["8", 0],
+      "text_embeds": ["7", 0],
+      "steps": 25,
+      "cfg": 3.5,
+      "shift": 5.0,
+      "seed": 1024,
+      "scheduler": "unipc",
+      "riflex_freq_index": 0,
+      "rope_function": "comfy",
+      "force_offload": true
+    },
+    "class_type": "WanVideoSampler",
+    "_meta": { "title": "Orbital Flow Sampler" }
+  },
+  "10": {
+    "inputs": {
+      "vae": ["3", 0],
+      "samples": ["9", 0],
+      "enable_vae_tiling": true,
+      "tile_x": 272,
+      "tile_y": 272,
+      "tile_stride_x": 144,
+      "tile_stride_y": 128
+    },
+    "class_type": "WanVideoDecode",
+    "_meta": { "title": "Decode Video Latents" }
+  },
+  "11": {
+    "inputs": {
+      "images": ["10", 0],
+      "filename_prefix": "Ruby_Ecom_Orbit_Wan",
+      "format": "video/h264-mp4",
+      "frame_rate": 25.0,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": { "title": "Save Commercial Orbit MP4" }
+  }
+}

@@ -1,0 +1,898 @@
+{
+  "flux-klein-cumshot-slider.safetensors": {
+    "filename": "flux-klein-cumshot-slider.safetensors",
+    "friendlyName": "Cumshot Slider",
+    "modelId": 2340052,
+    "baseModel": "Flux.2 Klein 9B",
+    "source": "civitai"
+  },
+  "flux-aging-slider.safetensors": {
+    "filename": "flux-aging-slider.safetensors",
+    "friendlyName": "BSS Aging Slider",
+    "modelId": 2212878,
+    "baseModel": "Illustrious",
+    "source": "civitai"
+  },
+  "flux-pornmaster-asian-beauty.safetensors": {
+    "filename": "flux-pornmaster-asian-beauty.safetensors",
+    "friendlyName": "Pornmaster Asian Beauty",
+    "modelId": 1810637,
+    "baseModel": "SDXL 1.0",
+    "source": "civitai"
+  },
+  "flux-sexgod-doggystyle.safetensors": {
+    "filename": "flux-sexgod-doggystyle.safetensors",
+    "friendlyName": "Sexgod Doggystyle",
+    "modelId": 2532708,
+    "baseModel": "Flux.2 Klein 9B",
+    "source": "civitai"
+  },
+  "flux-amateur-photography.safetensors": {
+    "filename": "flux-amateur-photography.safetensors",
+    "friendlyName": "Amateur Photography",
+    "modelId": 652699,
+    "baseModel": "ZImageBase",
+    "source": "civitai"
+  },
+  "flux-betternudes.safetensors": {
+    "filename": "flux-betternudes.safetensors",
+    "friendlyName": "Photoreal Betternudes",
+    "modelId": 2174081,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-airport-crush.safetensors": {
+    "filename": "flux-airport-crush.safetensors",
+    "friendlyName": "Airport Crush",
+    "modelId": 2329784,
+    "baseModel": "ZImageTurbo",
+    "source": "civitai"
+  },
+  "flux-2000s-analog-core.safetensors": {
+    "filename": "flux-2000s-analog-core.safetensors",
+    "friendlyName": "2000s Analog Core",
+    "modelId": 1134895,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-ankle-grab-missionary.safetensors": {
+    "filename": "flux-ankle-grab-missionary.safetensors",
+    "friendlyName": "Ankle Grab Missionary",
+    "modelId": 933597,
+    "baseModel": "Illustrious",
+    "source": "civitai"
+  },
+  "flux-vintage-lingerie.safetensors": {
+    "filename": "flux-vintage-lingerie.safetensors",
+    "friendlyName": "Boudoirtime Vintage Lingerie",
+    "modelId": 1578043,
+    "baseModel": "Illustrious",
+    "source": "civitai"
+  },
+  "flux-lenovo-ultrareal.safetensors": {
+    "filename": "flux-lenovo-ultrareal.safetensors",
+    "friendlyName": "Lenovo Ultrareal",
+    "modelId": 1972981,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-sex-nudes-other-fun-stuff-snofs.safetensors": {
+    "filename": "flux-sex-nudes-other-fun-stuff-snofs.safetensors",
+    "friendlyName": "SNOFS Detailer",
+    "modelId": 1972981,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-krea2-klein.safetensors": {
+    "filename": "flux-krea2-klein.safetensors",
+    "friendlyName": "Krea2 Klein",
+    "modelId": 1838378,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-saggy-breasts.safetensors": {
+    "filename": "flux-saggy-breasts.safetensors",
+    "friendlyName": "Natural Saggy Breasts",
+    "modelId": 1844246,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "flux-macromastia-clothed.safetensors": {
+    "filename": "flux-macromastia-clothed.safetensors",
+    "friendlyName": "Macromastia Clothed",
+    "modelId": 2294035,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "aidmaNSFWunlock-FLUX-V0.2.safetensors": {
+    "filename": "aidmaNSFWunlock-FLUX-V0.2.safetensors",
+    "friendlyName": "NSFW Unlock",
+    "modelId": null,
+    "baseModel": "Flux.1",
+    "source": "huggingface"
+  },
+  "flux-skin-detailer.safetensors": {
+    "filename": "flux-skin-detailer.safetensors",
+    "friendlyName": "Realistic Skin & Detail",
+    "modelId": null,
+    "baseModel": "Flux.1",
+    "source": "huggingface"
+  },
+  "flux-female-anatomy.safetensors": {
+    "filename": "flux-female-anatomy.safetensors",
+    "friendlyName": "Female Anatomy",
+    "modelId": null,
+    "baseModel": "Flux.1",
+    "source": "huggingface"
+  },
+  "futanari-bulge.safetensors": {
+    "filename": "futanari-bulge.safetensors",
+    "friendlyName": "Futanari Bulge",
+    "modelId": null,
+    "baseModel": "Unknown",
+    "source": "huggingface"
+  },
+  "super-realism.safetensors": {
+    "filename": "super-realism.safetensors",
+    "friendlyName": "Super Realism",
+    "modelId": null,
+    "baseModel": "Unknown",
+    "source": "huggingface"
+  },
+  "flux-detailer.safetensors": {
+    "filename": "flux-detailer.safetensors",
+    "friendlyName": "Flux Detailer",
+    "modelId": null,
+    "baseModel": "Flux.1",
+    "source": "huggingface"
+  },
+  "flux-4-play-nsfw.safetensors": {
+    "filename": "flux-4-play-nsfw.safetensors",
+    "friendlyName": "Flux 4 Play AIO NSFW",
+    "modelId": 2403747,
+    "baseModel": "Flux.2 Klein 9B-base",
+    "source": "civitai"
+  },
+  "krea2-instagram-influencer.safetensors": {
+    "filename": "krea2-instagram-influencer.safetensors",
+    "friendlyName": "Instagram Influencers",
+    "modelId": 2740040,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-rawgirl-spicy.safetensors": {
+    "filename": "krea2-rawgirl-spicy.safetensors",
+    "friendlyName": "Raw Girl Spicy",
+    "modelId": 2766540,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-phone-photography.safetensors": {
+    "filename": "krea2-phone-photography.safetensors",
+    "friendlyName": "Phone Photography 2000-2025",
+    "modelId": 2537408,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-reverse-cowgirl-anal.safetensors": {
+    "filename": "krea2-reverse-cowgirl-anal.safetensors",
+    "friendlyName": "Reverse Cowgirl Anal Full Nelson",
+    "modelId": 199865,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2_Enhancer.safetensors": {
+    "filename": "krea2_Enhancer.safetensors",
+    "friendlyName": "Krea2 Enhancer",
+    "modelId": 2730896,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "secret-sauce-krea2.safetensors": {
+    "filename": "secret-sauce-krea2.safetensors",
+    "friendlyName": "Secret Sauce Krea2",
+    "modelId": 2738819,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "hmcum-krea2.safetensors": {
+    "filename": "hmcum-krea2.safetensors",
+    "friendlyName": "HMCum Cum LoRA",
+    "modelId": 2750024,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "fake-breasts-krea2.safetensors": {
+    "filename": "fake-breasts-krea2.safetensors",
+    "friendlyName": "Fake Breasts / Bimbo",
+    "modelId": 2182514,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "penis-size-slider-krea2.safetensors": {
+    "filename": "penis-size-slider-krea2.safetensors",
+    "friendlyName": "Penis Size Slider",
+    "modelId": 2687793,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-latex.safetensors": {
+    "filename": "krea2-latex.safetensors",
+    "friendlyName": "Krea2 Latex Outfit",
+    "modelId": 2754404,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "penis-state-krea2.safetensors": {
+    "filename": "penis-state-krea2.safetensors",
+    "friendlyName": "Penis State (E/F)",
+    "modelId": 2754935,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "hucow-milking.safetensors": {
+    "filename": "hucow-milking.safetensors",
+    "friendlyName": "Hucow Milking",
+    "modelId": 377718,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "Realistic_studio_zimage_epoch_10.safetensors": {
+    "filename": "Realistic_studio_zimage_epoch_10.safetensors",
+    "friendlyName": "Realistic Skin & Face",
+    "modelId": 1426727,
+    "baseModel": "ZImageTurbo",
+    "source": "civitai"
+  },
+  "facial-cumshot-krea2.safetensors": {
+    "filename": "facial-cumshot-krea2.safetensors",
+    "friendlyName": "Facial Cumshot",
+    "modelId": 2173844,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "handsfree-blowjob-krea2.safetensors": {
+    "filename": "handsfree-blowjob-krea2.safetensors",
+    "friendlyName": "Handsfree Blowjob",
+    "modelId": 873218,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-aio-nsfw.safetensors": {
+    "filename": "krea2-aio-nsfw.safetensors",
+    "friendlyName": "Krea2 AIO NSFW",
+    "modelId": 2732306,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "instagramification-krea2.safetensors": {
+    "filename": "instagramification-krea2.safetensors",
+    "friendlyName": "Amateur Instagramification",
+    "modelId": 1379962,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "nsfw-v4-krea2.safetensors": {
+    "filename": "nsfw-v4-krea2.safetensors",
+    "friendlyName": "Krea 2 NSFW V4",
+    "modelId": 2725430,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "thot-shot-skye-krea2.safetensors": {
+    "filename": "thot-shot-skye-krea2.safetensors",
+    "friendlyName": "RLY Thot Shot Skye",
+    "modelId": 2621144,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "realistic-slider-krea2.safetensors": {
+    "filename": "realistic-slider-krea2.safetensors",
+    "friendlyName": "Realistic Slider",
+    "modelId": 2727636,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "femboy-krea2.safetensors": {
+    "filename": "femboy-krea2.safetensors",
+    "friendlyName": "Trans Femboy",
+    "modelId": 1899877,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "pornmaster-detail-slider-krea2.safetensors": {
+    "filename": "pornmaster-detail-slider-krea2.safetensors",
+    "friendlyName": "PornMaster Detail Slider",
+    "modelId": 2736613,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "pornmaster-uncensored-krea2.safetensors": {
+    "filename": "pornmaster-uncensored-krea2.safetensors",
+    "friendlyName": "PornMaster Uncensored",
+    "modelId": 2768638,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-large-penis.safetensors": {
+    "filename": "krea2-large-penis.safetensors",
+    "friendlyName": "Large Erect Penis",
+    "modelId": 2758043,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-bigger-glans.safetensors": {
+    "filename": "krea2-bigger-glans.safetensors",
+    "friendlyName": "Bigger Glans",
+    "modelId": 2770395,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-mystic-xxx.safetensors": {
+    "filename": "krea2-mystic-xxx.safetensors",
+    "friendlyName": "Krea 2 Mystic XXX",
+    "modelId": 2728644,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-futanari-anatomy.safetensors": {
+    "filename": "krea2-futanari-anatomy.safetensors",
+    "friendlyName": "Futanari Anatomy",
+    "modelId": 2774695,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-penis.safetensors": {
+    "filename": "krea2-penis.safetensors",
+    "friendlyName": "Penis LoRA",
+    "modelId": 2762477,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-anal-helper.safetensors": {
+    "filename": "krea2-anal-helper.safetensors",
+    "friendlyName": "Anal Helper",
+    "modelId": 2759414,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-filter-bypass.safetensors": {
+    "filename": "krea2-filter-bypass.safetensors",
+    "friendlyName": "Krea2 Filter Bypass",
+    "modelId": 2728234,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-big-ass-hips.safetensors": {
+    "filename": "krea2-big-ass-hips.safetensors",
+    "friendlyName": "Big Ass & Hips",
+    "modelId": 1888846,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-body-weight-slider.safetensors": {
+    "filename": "krea2-body-weight-slider.safetensors",
+    "friendlyName": "Body Weight Slider",
+    "modelId": 2318844,
+    "baseModel": "Flux.2 Klein 9B",
+    "source": "civitai"
+  },
+  "krea2-metal-bondage.safetensors": {
+    "filename": "krea2-metal-bondage.safetensors",
+    "friendlyName": "Metal Bondage Frame",
+    "modelId": 2759105,
+    "baseModel": "Anima",
+    "source": "civitai"
+  },
+  "krea2-realistic-snapshot.safetensors": {
+    "filename": "krea2-realistic-snapshot.safetensors",
+    "friendlyName": "Realistic Snapshot",
+    "modelId": 2268008,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-seed-variance-enhancer.safetensors": {
+    "filename": "krea2-seed-variance-enhancer.safetensors",
+    "friendlyName": "Seed Variance Enhancer",
+    "modelId": 2743585,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-boob-grabbing.safetensors": {
+    "filename": "krea2-boob-grabbing.safetensors",
+    "friendlyName": "Mega Boob Grabbing",
+    "modelId": 2762728,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-facegrid.safetensors": {
+    "filename": "krea2-facegrid.safetensors",
+    "friendlyName": "FaceGrid 18-Angles",
+    "modelId": 2771146,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "krea2-hard-nipples.safetensors": {
+    "filename": "krea2-hard-nipples.safetensors",
+    "friendlyName": "Hard Erect Nipples",
+    "modelId": 2772968,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "ltx-smooth-60fps.safetensors": {
+    "filename": "ltx-smooth-60fps.safetensors",
+    "friendlyName": "LTX 2.5 60 FPS Smooth",
+    "modelId": 2643902,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-ultimate-deepthroat.safetensors": {
+    "filename": "ltx-ultimate-deepthroat.safetensors",
+    "friendlyName": "Ultimate Deepthroat & NSFW",
+    "modelId": 2570733,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-rogue-missionary.safetensors": {
+    "filename": "ltx-rogue-missionary.safetensors",
+    "friendlyName": "Rogue AI Missionary/Cowgirl",
+    "modelId": 2471327,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-anal-play.safetensors": {
+    "filename": "ltx-anal-play.safetensors",
+    "friendlyName": "Anal Play LTX 2.5",
+    "modelId": 2679841,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-3d-animations.safetensors": {
+    "filename": "ltx-3d-animations.safetensors",
+    "friendlyName": "3D Animations NSFW",
+    "modelId": 2668822,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-behind-facing-cam.safetensors": {
+    "filename": "ltx-behind-facing-cam.safetensors",
+    "friendlyName": "Sex from Behind Facing Cam",
+    "modelId": 2298764,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-paizuri-thrust.safetensors": {
+    "filename": "ltx-paizuri-thrust.safetensors",
+    "friendlyName": "Paizuri/Titfuck Thrusting",
+    "modelId": 2364658,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-creampie-cum-early.safetensors": {
+    "filename": "ltx-creampie-cum-early.safetensors",
+    "friendlyName": "Creampie Cum Early",
+    "modelId": 2555053,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-fingering.safetensors": {
+    "filename": "ltx-fingering.safetensors",
+    "friendlyName": "Fingering LTX 2.5",
+    "modelId": 2424454,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-sexgod-female-nudity.safetensors": {
+    "filename": "ltx-sexgod-female-nudity.safetensors",
+    "friendlyName": "Sexgod Female Nudity",
+    "modelId": 2308157,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-sexgod-hairy.safetensors": {
+    "filename": "ltx-sexgod-hairy.safetensors",
+    "friendlyName": "Sexgod Hairy Girls",
+    "modelId": 2505376,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-sexgod-breast-massage.safetensors": {
+    "filename": "ltx-sexgod-breast-massage.safetensors",
+    "friendlyName": "Sexgod Breast Massage",
+    "modelId": 2484982,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-better-breasts-motion.safetensors": {
+    "filename": "ltx-better-breasts-motion.safetensors",
+    "friendlyName": "Better Breasts Motion",
+    "modelId": 2536021,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-pussyjob-sulphur.safetensors": {
+    "filename": "ltx-pussyjob-sulphur.safetensors",
+    "friendlyName": "Pussyjob LTX 2.5",
+    "modelId": 2492660,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "wan-hits-face.safetensors": {
+    "filename": "wan-hits-face.safetensors",
+    "friendlyName": "Anything Hits the Face",
+    "modelId": 1871577,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-slop-bounce.safetensors": {
+    "filename": "wan-slop-bounce.safetensors",
+    "friendlyName": "Slop Bounce I2V",
+    "modelId": 1944129,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-double-handy-bj.safetensors": {
+    "filename": "wan-double-handy-bj.safetensors",
+    "friendlyName": "Doublesinglehandy Blowjob",
+    "modelId": 1395313,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-slop-twerk.safetensors": {
+    "filename": "wan-slop-twerk.safetensors",
+    "friendlyName": "Slop Twerk I2V",
+    "modelId": 2008663,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-mating-press.safetensors": {
+    "filename": "wan-mating-press.safetensors",
+    "friendlyName": "Mating Press I2V",
+    "modelId": 2368333,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-lip-bite.safetensors": {
+    "filename": "wan-lip-bite.safetensors",
+    "friendlyName": "Wan 2.1 Lip Bite",
+    "modelId": 2151575,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "wan-solo-dildo.safetensors": {
+    "filename": "wan-solo-dildo.safetensors",
+    "friendlyName": "Wan 2.1 Solo Dildo",
+    "modelId": 1707303,
+    "baseModel": "LTXV2",
+    "source": "civitai"
+  },
+  "ltx-solo-dildo.safetensors": {
+    "filename": "ltx-solo-dildo.safetensors",
+    "friendlyName": "LTX Video Solo Dildo",
+    "modelId": 1707303,
+    "baseModel": "LTXV2",
+    "source": "civitai"
+  },
+  "wan-dr34ml4y-nsfw.safetensors": {
+    "filename": "wan-dr34ml4y-nsfw.safetensors",
+    "friendlyName": "DR34ML4Y AIO NSFW",
+    "modelId": 1811313,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "wan-cowgirl.safetensors": {
+    "filename": "wan-cowgirl.safetensors",
+    "friendlyName": "Wan 2.2 Cowgirl",
+    "modelId": 1428098,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-smoothmix.safetensors": {
+    "filename": "wan-smoothmix.safetensors",
+    "friendlyName": "Wan 2.2 SmoothMix",
+    "modelId": 2040641,
+    "baseModel": "Wan Video 2.2 T2V-A14B",
+    "source": "civitai"
+  },
+  "wan-seductive-turns.safetensors": {
+    "filename": "wan-seductive-turns.safetensors",
+    "friendlyName": "Wan 2.2 Seductive Turns",
+    "modelId": 1663409,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-big-splash.safetensors": {
+    "filename": "wan-big-splash.safetensors",
+    "friendlyName": "Wan 2.2 Big Splash",
+    "modelId": 1634180,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-bouncy-bends.safetensors": {
+    "filename": "wan-bouncy-bends.safetensors",
+    "friendlyName": "Wan 2.2 Bouncy Bends",
+    "modelId": 1433071,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "ltx-synth-pussy.safetensors": {
+    "filename": "ltx-synth-pussy.safetensors",
+    "friendlyName": "Synth Pussy",
+    "modelId": 2509189,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-penile-praxis.safetensors": {
+    "filename": "ltx-penile-praxis.safetensors",
+    "friendlyName": "Penile Praxis",
+    "modelId": 2332473,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-stomach-bulge.safetensors": {
+    "filename": "ltx-stomach-bulge.safetensors",
+    "friendlyName": "Stomach Bulge",
+    "modelId": 1445226,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-riding-pov.safetensors": {
+    "filename": "ltx-riding-pov.safetensors",
+    "friendlyName": "Riding POV",
+    "modelId": 2446218,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-futa-cumshot.safetensors": {
+    "filename": "ltx-futa-cumshot.safetensors",
+    "friendlyName": "Futa Cumshot",
+    "modelId": 2011853,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-cowgirl-futa-ride.safetensors": {
+    "filename": "ltx-cowgirl-futa-ride.safetensors",
+    "friendlyName": "Cowgirl & Futa Ride",
+    "modelId": 2483655,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-penis-sulphur.safetensors": {
+    "filename": "ltx-penis-sulphur.safetensors",
+    "friendlyName": "Sulphur Penis",
+    "modelId": 2598050,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-sexgod-handjobs.safetensors": {
+    "filename": "ltx-sexgod-handjobs.safetensors",
+    "friendlyName": "SexGod Handjobs",
+    "modelId": 2542266,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-creampie-animation.safetensors": {
+    "filename": "ltx-creampie-animation.safetensors",
+    "friendlyName": "Creampie Animation",
+    "modelId": 2401204,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-bouncy-walk.safetensors": {
+    "filename": "ltx-bouncy-walk.safetensors",
+    "friendlyName": "Bouncy Walk",
+    "modelId": 1361346,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-bouncing-boobs.safetensors": {
+    "filename": "ltx-bouncing-boobs.safetensors",
+    "friendlyName": "Bouncing Boobs",
+    "modelId": 1343431,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-nsfw-body-physics.safetensors": {
+    "filename": "ltx-nsfw-body-physics.safetensors",
+    "friendlyName": "NSFW Body Physics",
+    "modelId": 2668916,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-soft-enhance.safetensors": {
+    "filename": "ltx-soft-enhance.safetensors",
+    "friendlyName": "Soft Detail Enhance",
+    "modelId": 2535622,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "wan-perfect-fingering.safetensors": {
+    "filename": "wan-perfect-fingering.safetensors",
+    "friendlyName": "Perfect Fingering",
+    "modelId": 1952032,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-futa-cumshot.safetensors": {
+    "filename": "wan-futa-cumshot.safetensors",
+    "friendlyName": "Futa Cumshot Wan 2.2",
+    "modelId": 2011853,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "wan-f4c3spl4sh.safetensors": {
+    "filename": "wan-f4c3spl4sh.safetensors",
+    "friendlyName": "F4C3SPL4SH Cumshot",
+    "modelId": 1922973,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-bouncing-boobs.safetensors": {
+    "filename": "wan-bouncing-boobs.safetensors",
+    "friendlyName": "Bouncing Boobs Wan 2.2",
+    "modelId": 1343431,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "wan-cum-facial.safetensors": {
+    "filename": "wan-cum-facial.safetensors",
+    "friendlyName": "Cum/Facial Wan 2.2",
+    "modelId": 1962545,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-pov-titfuck.safetensors": {
+    "filename": "wan-pov-titfuck.safetensors",
+    "friendlyName": "POV Paizuri/Titfuck",
+    "modelId": 2070335,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-breast-play.safetensors": {
+    "filename": "wan-breast-play.safetensors",
+    "friendlyName": "Breast Play",
+    "modelId": 1913617,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-deepthroat.safetensors": {
+    "filename": "wan-deepthroat.safetensors",
+    "friendlyName": "Deepthroat Wan 2.2",
+    "modelId": 2023407,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-ultimate-deepthroat.safetensors": {
+    "filename": "wan-ultimate-deepthroat.safetensors",
+    "friendlyName": "Ultimate Deepthroat",
+    "modelId": 1874811,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "wan-doggy-style.safetensors": {
+    "filename": "wan-doggy-style.safetensors",
+    "friendlyName": "Doggy Style Sex",
+    "modelId": 672232,
+    "baseModel": "Wan Video 2.2 I2V-A14B",
+    "source": "civitai"
+  },
+  "ltx-deepthroat.safetensors": {
+    "filename": "ltx-deepthroat.safetensors",
+    "friendlyName": "Deepthroat LTX 2.5",
+    "modelId": 2476698,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-fingering-dildo.safetensors": {
+    "filename": "ltx-fingering-dildo.safetensors",
+    "friendlyName": "Fingering/Dildo LTX",
+    "modelId": 2580360,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-real-orgasm.safetensors": {
+    "filename": "ltx-real-orgasm.safetensors",
+    "friendlyName": "Real Orgasm",
+    "modelId": 2630331,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-reasoning.safetensors": {
+    "filename": "ltx-reasoning.safetensors",
+    "friendlyName": "Video Reasoning",
+    "modelId": 2497207,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-better-physics.safetensors": {
+    "filename": "ltx-better-physics.safetensors",
+    "friendlyName": "Better Physics",
+    "modelId": 2592090,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-better-nsfw-motion.safetensors": {
+    "filename": "ltx-better-nsfw-motion.safetensors",
+    "friendlyName": "Better NSFW Motion",
+    "modelId": 2344781,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-joyshot-cumshot.safetensors": {
+    "filename": "ltx-joyshot-cumshot.safetensors",
+    "friendlyName": "Joyshot Cumshot",
+    "modelId": 2680695,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-epic-cumshots.safetensors": {
+    "filename": "ltx-epic-cumshots.safetensors",
+    "friendlyName": "Epic Cumshots",
+    "modelId": 2621242,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-anal-insertion.safetensors": {
+    "filename": "ltx-anal-insertion.safetensors",
+    "friendlyName": "Anal Insertion",
+    "modelId": 2002532,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "ltx-better-motion.safetensors": {
+    "filename": "ltx-better-motion.safetensors",
+    "friendlyName": "Better Motion LTX 2.5",
+    "modelId": 2734359,
+    "baseModel": "LTXV 2.5",
+    "source": "civitai"
+  },
+  "CyberRealistic_zit_catalyst_v2.0.safetensors": {
+    "filename": "CyberRealistic_zit_catalyst_v2.0.safetensors",
+    "friendlyName": "CyberRealistic ZIT Catalyst",
+    "modelId": 2513307,
+    "baseModel": "ZImageTurbo",
+    "source": "civitai"
+  },
+  "moodyDesireMix_v30.safetensors": {
+    "filename": "moodyDesireMix_v30.safetensors",
+    "friendlyName": "Moody Desire Mix",
+    "modelId": 2519616,
+    "baseModel": "Flux.2 Klein 9B",
+    "source": "civitai"
+  },
+  "pornmasterKrea2_v2TurboInt8.safetensors": {
+    "filename": "pornmasterKrea2_v2TurboInt8.safetensors",
+    "friendlyName": "PornMaster Krea2 Checkpoint",
+    "modelId": 2735032,
+    "baseModel": "Krea 2",
+    "source": "civitai"
+  },
+  "Qwen4Play2512_v2.safetensors": {
+    "filename": "Qwen4Play2512_v2.safetensors",
+    "friendlyName": "QWEN 4 PLAY AIO NSFW",
+    "modelId": 2004155,
+    "baseModel": "Qwen",
+    "source": "civitai"
+  },
+  "smoothMixWan2214BI2V_i2vV20High.safetensors": {
+    "filename": "smoothMixWan2214BI2V_i2vV20High.safetensors",
+    "friendlyName": "Smooth Mix Wan 2.2 14B",
+    "modelId": 1995784,
+    "baseModel": "Wan Video 2.2 T2V-A14B",
+    "source": "civitai"
+  },
+  "tgirlsXlAndSd15_v10.safetensors": {
+    "filename": "tgirlsXlAndSd15_v10.safetensors",
+    "friendlyName": "TGirls XL & SD15",
+    "modelId": 8328,
+    "baseModel": "SDXL 1.0",
+    "source": "civitai"
+  },
+  "qwen3_vl_4b_abliterated.safetensors": {
+    "filename": "qwen3_vl_4b_abliterated.safetensors",
+    "friendlyName": "Qwen3-VL-4B Abliterated",
+    "modelId": 2731465,
+    "baseModel": "Other",
+    "source": "civitai"
+  }
+}

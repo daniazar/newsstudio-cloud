@@ -1,0 +1,93 @@
+{
+  "1": {
+    "inputs": {
+      "image": "input_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Source Image" }
+  },
+  "2": {
+    "inputs": {
+      "unet_name": "hunyuan_image_3.0_dit.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Hunyuan3.0 UNET" }
+  },
+  "3": {
+    "inputs": {
+      "clip_name1": "hunyuan_clip_l.safetensors",
+      "clip_name2": "hunyuan_t5xxl.safetensors",
+      "type": "hunyuan"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": { "title": "Load Hunyuan CLIP/T5" }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "hunyuan_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" }
+  },
+  "10": {
+    "inputs": {
+      "lora_name": "hunyuan3_custom_person.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": ["2", 0],
+      "clip": ["3", 0]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "Load Hunyuan Person LoRA" }
+  },
+  "5": {
+    "inputs": {
+      "text": "一个专业的新闻播音员，写实的肖像，高清摄影，演播室背景 (A professional news presenter, realistic portrait, high definition photography, studio background)",
+      "clip": ["10", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Text Prompt (Chinese/English)" }
+  },
+  "6": {
+    "inputs": {
+      "pixels": ["1", 0],
+      "vae": ["4", 0]
+    },
+    "class_type": "VAEEncode",
+    "_meta": { "title": "VAE Encode (Start Latent)" }
+  },
+  "7": {
+    "inputs": {
+      "seed": 8888,
+      "steps": 25,
+      "cfg": 6.0,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.55,
+      "model": ["10", 0],
+      "positive": ["5", 0],
+      "negative": ["5", 0],
+      "latent_image": ["6", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "Hunyuan3 KSampler" }
+  },
+  "8": {
+    "inputs": {
+      "samples": ["7", 0],
+      "vae": ["4", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "hunyuan3_lora_output"
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Output Image" }
+  }
+}

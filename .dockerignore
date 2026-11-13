@@ -1,0 +1,53 @@
+node_modules
+.next
+.git
+dev.db
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-shm
+*.db-wal
+*.zip
+storage/cache/
+antigravity_conversations*
+
+# Ignore model weights and caches to prevent massive Docker build context
+vendor/ComfyUI/models/
+vendor/ComfyUI/output/
+vendor/ComfyUI/user/
+vendor/ComfyUI/venv/
+
+vendor/SadTalker-Server/checkpoints/
+vendor/SadTalker-Server/tmp_uploads/
+vendor/SadTalker-Server/venv/
+
+vendor/Chatterbox-TTS-Server/model_cache/
+vendor/Chatterbox-TTS-Server/outputs/
+vendor/Chatterbox-TTS-Server/venv/
+
+public/assets/
+scratch/
+
+# GPU servers — not needed in app container
+vendor/Modern-TTS-Server/
+vendor/Modern-TalkingHead-Server/
+vendor/MuseTalk/
+vendor/KeySync-Server/
+vendor/LivePortrait-Server/
+vendor/Modern-Mesh-Server/
+vendor/Modern-Motion-Animation-Server/
+
+# Docs, scripts, infra (not needed at runtime)
+docs/
+scripts/
+infra/
+.agents/
+
+# Test files
+**/__tests__/
+coverage/
+
+# Logs
+*.log
+logs/
+

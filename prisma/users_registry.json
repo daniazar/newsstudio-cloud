@@ -1,0 +1,47 @@
+[
+  {
+    "id": "federico-id",
+    "email": "federico@newsstudio.com",
+    "name": "Federico Ferrari",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "isActive": true,
+    "role": "admin",
+    "createdAt": "2026-05-27T04:09:46.433Z"
+  },
+  {
+    "id": "facundo-id",
+    "email": "facundo@newsstudio.com",
+    "name": "Facundo Ruiz",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "isActive": true,
+    "role": "admin",
+    "createdAt": "2026-05-27T04:09:46.433Z"
+  },
+  {
+    "id": "daniel-id",
+    "email": "daniel@newsstudio.com",
+    "name": "Daniel Azar",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "isActive": true,
+    "role": "admin",
+    "createdAt": "2026-05-27T04:09:46.433Z"
+  },
+  {
+    "id": "danielazar-id",
+    "email": "danielazar@newsstudio.com",
+    "name": "Daniel Azar",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "isActive": true,
+    "role": "admin",
+    "createdAt": "2026-05-27T04:09:46.433Z"
+  },
+  {
+    "id": "admin-id",
+    "email": "admin@newsstudio.com",
+    "name": "Admin User",
+    "passwordHash": "fce92f2e61bbe881ea3aaa8da45bbfc321aee22945f6c7331d54c17b22a43675",
+    "isActive": true,
+    "role": "admin",
+    "createdAt": "2026-05-27T04:09:46.433Z"
+  }
+]

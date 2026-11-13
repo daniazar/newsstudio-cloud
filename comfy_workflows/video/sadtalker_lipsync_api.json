@@ -1,0 +1,55 @@
+{
+  "1": {
+    "inputs": {
+      "image": "ruby.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Image" }
+  },
+  "2": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "width": 512,
+      "height": 512,
+      "crop": "center",
+      "image": ["1", 0]
+    },
+    "class_type": "ImageScale",
+    "_meta": { "title": "Resize Image" }
+  },
+  "3": {
+    "inputs": {
+      "audio": "input_audio.wav",
+      "upload": "audio"
+    },
+    "class_type": "LoadAudio",
+    "_meta": { "title": "Load Audio" }
+  },
+  "4": {
+    "inputs": {
+      "image": ["2", 0],
+      "audio": ["3", 0],
+      "pose_style": 0,
+      "exp_weight": 1.0,
+      "use_ref_video": false,
+      "ref_info": "pose",
+      "ref_video": "",
+      "blink_style": "standard",
+      "enhancer": "GFPGAN",
+      "verbose": false
+    },
+    "class_type": "SadTalkerNode",
+    "_meta": { "title": "SadTalker Lip Sync" }
+  },
+  "5": {
+    "inputs": {
+      "images": ["4", 0],
+      "filename_prefix": "sadtalker_output",
+      "format": "video/nvenc_h264-mp4",
+      "fps": 25.0
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": { "title": "Save Video" }
+  }
+}

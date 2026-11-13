@@ -1,0 +1,31 @@
+{
+  "product": {
+    "id": 8941209381,
+    "title": "Natural European White Oak Engineered Hardwood Flooring",
+    "vendor": "LuxeFloor Co",
+    "product_type": "Flooring",
+    "handle": "natural-european-white-oak-engineered-hardwood",
+    "body_html": "<p>Transform your living space with authentic European White Oak planks.</p><ul><li>100% Waterproof seal with 72-hour standing water barrier</li><li>Click-Lock DIY installation without glue or nails</li><li>Scratch-resistant AC4 commercial grade protective finish</li><li>Ultra-matte wirebrushed texture reveals genuine wood grain</li><li>Covers 24.5 sq ft per carton</li></ul>",
+    "variants": [
+      {
+        "id": 481029381,
+        "title": "Natural Oak / 7.5\" Wide",
+        "price": "89.99",
+        "compare_at_price": "129.99",
+        "available": true,
+        "sku": "OAK-WHT-75",
+        "option1": "Natural Oak",
+        "option2": "7.5\" Wide"
+      }
+    ],
+    "images": [
+      {
+        "id": 91823901,
+        "src": "https://cdn.shopify.com/s/files/1/0001/products/oak_plank_large.jpg?v=1700000000",
+        "width": 3000,
+        "height": 3000,
+        "alt": "European White Oak Planks Staged"
+      }
+    ]
+  }
+}

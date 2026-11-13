@@ -1,0 +1,84 @@
+{
+  "1": {
+    "inputs": {
+      "image": "input_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Source Image" }
+  },
+  "2": {
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load SDXL Checkpoint" }
+  },
+  "9": {
+    "inputs": {
+      "lora_name": "custom_person_sdxl_lora.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": ["2", 0],
+      "clip": ["2", 1]
+    },
+    "class_type": "LoraLoader",
+    "_meta": { "title": "Load Person LoRA" }
+  },
+  "3": {
+    "inputs": {
+      "text": "a professional news presenter, realistic portrait of a person, studio background, sharp focus",
+      "clip": ["9", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "4": {
+    "inputs": {
+      "text": "blurry, low quality, distorted, bad anatomy, deformed eyes",
+      "clip": ["9", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" }
+  },
+  "5": {
+    "inputs": {
+      "pixels": ["1", 0],
+      "vae": ["2", 2]
+    },
+    "class_type": "VAEEncode",
+    "_meta": { "title": "VAE Encode (Start Latent)" }
+  },
+  "6": {
+    "inputs": {
+      "seed": 42,
+      "steps": 30,
+      "cfg": 7.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "normal",
+      "denoise": 0.5,
+      "model": ["9", 0],
+      "positive": ["3", 0],
+      "negative": ["4", 0],
+      "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler (img2img + LoRA)" }
+  },
+  "7": {
+    "inputs": {
+      "samples": ["6", 0],
+      "vae": ["2", 2]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "8": {
+    "inputs": {
+      "images": ["7", 0],
+      "filename_prefix": "img2img_lora_output"
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Output Image" }
+  }
+}

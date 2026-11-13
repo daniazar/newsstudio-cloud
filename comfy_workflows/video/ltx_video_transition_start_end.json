@@ -1,0 +1,173 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "ltx-video-2.5.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" }
+  },
+  "2": {
+    "inputs": {
+      "image": "avatar_start.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Start Keyframe (State A)" }
+  },
+  "2b": {
+    "inputs": {
+      "image": "avatar_end.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load End Keyframe (State B)" }
+  },
+  "4": {
+    "inputs": {
+      "text": "cinematic smooth camera move, broadcast studio transition, anchor moving between positions, studio lighting, high definition, detailed motion",
+      "clip": ["22", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt (Transition)" }
+  },
+  "5": {
+    "inputs": {
+      "text": "jump cut, abrupt motion, flickering, low quality, warped face, distorted motion, color shift, static image, frozen frame",
+      "clip": ["22", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" }
+  },
+  "8": {
+    "inputs": {
+      "width": 576,
+      "height": 1024,
+      "length": 49,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": { "title": "Empty Video Latent" }
+  },
+  "9": {
+    "inputs": {
+      "image": ["2", 0],
+      "img_compression": 35
+    },
+    "class_type": "LTXVPreprocess",
+    "_meta": { "title": "Preprocess Start Image" }
+  },
+  "9b": {
+    "inputs": {
+      "image": ["2b", 0],
+      "img_compression": 35
+    },
+    "class_type": "LTXVPreprocess",
+    "_meta": { "title": "Preprocess End Image" }
+  },
+  "10": {
+    "inputs": {
+      "vae": ["1", 2],
+      "latent": ["8", 0],
+      "num_images": "2",
+      "num_images.image_1": ["9", 0],
+      "num_images.index_1": 0,
+      "num_images.strength_1": 0.85,
+      "num_images.image_2": ["9b", 0],
+      "num_images.index_2": -1,
+      "num_images.strength_2": 0.85
+    },
+    "class_type": "LTXVImgToVideoInplaceKJ",
+    "_meta": { "title": "Inplace Frame Lock (Start→End)" }
+  },
+  "12": {
+    "inputs": {
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "frame_rate": 25.0
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": { "title": "LTXV Conditioning" }
+  },
+  "13": {
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["12", 0],
+      "negative": ["12", 1],
+      "cfg": 3.0
+    },
+    "class_type": "CFGGuider",
+    "_meta": { "title": "CFG Guider" }
+  },
+  "14": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": { "title": "KSampler Select" }
+  },
+  "15": {
+    "inputs": {
+      "steps": 30,
+      "max_shift": 2.05,
+      "base_shift": 0.95,
+      "stretch": true,
+      "terminal": 0.1,
+      "latent": ["10", 0]
+    },
+    "class_type": "LTXVScheduler",
+    "_meta": { "title": "LTXV Scheduler" }
+  },
+  "16": {
+    "inputs": {
+      "noise_seed": 42,
+      "fixed_index": 0
+    },
+    "class_type": "RandomNoise",
+    "_meta": { "title": "Random Noise" }
+  },
+  "17": {
+    "inputs": {
+      "noise": ["16", 0],
+      "guider": ["13", 0],
+      "sampler": ["14", 0],
+      "sigmas": ["15", 0],
+      "latent_image": ["10", 0]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": { "title": "Sampler" }
+  },
+  "19": {
+    "inputs": {
+      "samples": ["17", 0],
+      "vae": ["1", 2],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 128,
+      "temporal_overlap": 32
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": { "title": "Decode Video" }
+  },
+  "21": {
+    "inputs": {
+      "images": ["19", 0],
+      "filename_prefix": "ltx_transition_output",
+      "format": "video/nvenc_h264-mp4",
+      "frame_rate": 25.0,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": { "title": "Save Transition Video Output" }
+  },
+  "22": {
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "ckpt_name": "ltx-video-2.5.safetensors",
+      "device": "default"
+    },
+    "class_type": "LTXAVTextEncoderLoader",
+    "_meta": { "title": "Load LTXV Audio Text Encoder" }
+  }
+}

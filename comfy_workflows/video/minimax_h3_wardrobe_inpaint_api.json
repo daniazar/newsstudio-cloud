@@ -1,0 +1,1026 @@
+{
+  "2": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Ref2VA Model"
+    }
+  },
+  "3": {
+    "class_type": "ModelAttentionBackend",
+    "inputs": {
+      "model": [
+        "116",
+        0
+      ],
+      "attention": "comfy kitchen attention"
+    },
+    "_meta": {
+      "title": "Comfy Kitchen Attention"
+    }
+  },
+  "4": {
+    "class_type": "MiniMaxChunkFeedForward",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "chunks": 4,
+      "seq_threshold": 4096
+    },
+    "_meta": {
+      "title": "Feed-Forward Chunks"
+    }
+  },
+  "5": {
+    "class_type": "MiniMaxLowVRAMAttention",
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "head_chunks": 4
+    },
+    "_meta": {
+      "title": "Attention Head Chunks"
+    }
+  },
+  "7": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "shift_video": 12,
+      "shift_audio": 3
+    },
+    "_meta": {
+      "title": "Sigma Shift | Video 12 / Audio 3"
+    }
+  },
+  "8": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "H3 Text Encoder"
+    }
+  },
+  "9": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "_meta": {
+      "title": "Video VAE | INT8 ConvRot"
+    }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "Audio VAE"
+    }
+  },
+  "11": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "ruby_burgundy_M1_loop_v1_audio.mp4",
+      "upload": ""
+    },
+    "_meta": {
+      "title": "Load Your Source Video"
+    }
+  },
+  "12": {
+    "class_type": "NKDTimeline",
+    "inputs": {
+      "media.media_0": [
+        "11",
+        0
+      ],
+      "timeline": "{\"v\":1,\"clips\":[{\"id\":\"c1d8n9\",\"src\":\"media_0\",\"track\":0,\"start\":0,\"trimIn\":0,\"length\":169}],\"masks\":[],\"tracks\":[],\"audio\":[],\"ui\":{\"playhead\":0}}",
+      "import_mode": "stack",
+      "aspect_ratio": "As Source",
+      "width": 768,
+      "height": 1024,
+      "megapixels": 0.8,
+      "size_multiple": 32,
+      "fit": "contain",
+      "fps": 24,
+      "model": "free",
+      "quantize_n": 8,
+      "start_frame": 0,
+      "frame_count": 0,
+      "clip_audio": true,
+      "clip_markers": false,
+      "nkd_timeline": "{\"v\":1,\"clips\":[{\"id\":\"c1d8n9\",\"src\":\"media_0\",\"track\":0,\"start\":0,\"trimIn\":0,\"length\":169}],\"masks\":[],\"tracks\":[],\"audio\":[],\"ui\":{\"playhead\":0}}"
+    },
+    "_meta": {
+      "title": "Source Timeline | Duration Auto; Resolution Here"
+    }
+  },
+  "13": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+    },
+    "_meta": {
+      "title": "SAM3.1 Tracker"
+    }
+  },
+  "14": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "13",
+        1
+      ],
+      "text": "face, head, hair"
+    },
+    "_meta": {
+      "title": "Track Source Subjects | Separate with commas"
+    }
+  },
+  "15": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "305",
+        0
+      ],
+      "model": [
+        "13",
+        0
+      ],
+      "conditioning": [
+        "14",
+        0
+      ],
+      "detection_threshold": 0.25,
+      "max_objects": 6,
+      "detect_interval": 1
+    },
+    "_meta": {
+      "title": "Track the Source Video"
+    }
+  },
+  "16": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "15",
+        0
+      ],
+      "object_indices": ""
+    },
+    "_meta": {
+      "title": "Track IDs | Blank = all; otherwise 0,1,..."
+    }
+  },
+  "18": {
+    "class_type": "MVEx_MaskCleanup",
+    "inputs": {
+      "masks": [
+        "16",
+        0
+      ],
+      "threshold": 0.35,
+      "method": "shrink_grow",
+      "method.shrink": 4,
+      "method.min_frames": 2,
+      "edge_grow": 32
+    },
+    "_meta": {
+      "title": "Clean Subject Mask"
+    }
+  },
+  "19": {
+    "class_type": "MVEx_SubjectCrop",
+    "inputs": {
+      "original_images": [
+        "305",
+        0
+      ],
+      "masks": [
+        "16",
+        0
+      ],
+      "mode": "tracked",
+      "mode.crop_scale": 1.5,
+      "crop_scale": 1.5,
+      "mode.padding": "firm",
+      "padding": "firm",
+      "mode.prefer": "stillness",
+      "prefer": "stillness",
+      "mode.aspect_ratio": 0,
+      "mode.seamless_loop": false,
+      "divisible_by": 32,
+      "upscale_megapixels": 0,
+      "resize_method": "auto"
+    },
+    "_meta": {
+      "title": "Edit Area | Tracked 1.5x Crop"
+    }
+  },
+  "20": {
+    "class_type": "GetImageSizeAndCount",
+    "inputs": {
+      "image": [
+        "19",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Automatic Width, Height + Frames"
+    }
+  },
+  "23": {
+    "class_type": "NKDMaskOps",
+    "inputs": {
+      "mask": [
+        "19",
+        1
+      ],
+      "vae": [
+        "9",
+        0
+      ],
+      "model": [
+        "5",
+        0
+      ],
+      "invert": false,
+      "black_point": 0.5,
+      "white_point": 0.5,
+      "despeckle": 2,
+      "fill_holes": false,
+      "close_gaps": 0,
+      "temporal_expand": 2,
+      "temporal_smooth": 2,
+      "expand": 0,
+      "blockify": 0,
+      "blockify_threshold": 0.05,
+      "feather": 8,
+      "edge_low": 0,
+      "edge_high": 1
+    },
+    "_meta": {
+      "title": "Generation Mask | Subject Garment Area"
+    }
+  },
+  "24": {
+    "class_type": "NKDMaskOps",
+    "inputs": {
+      "mask": [
+        "19",
+        1
+      ],
+      "invert": false,
+      "black_point": 0.5,
+      "white_point": 0.5,
+      "despeckle": 2,
+      "fill_holes": false,
+      "close_gaps": 0,
+      "temporal_expand": 2,
+      "temporal_smooth": 2,
+      "expand": 0,
+      "blockify": 0,
+      "blockify_threshold": 0.05,
+      "feather": 12,
+      "edge_low": 0,
+      "edge_high": 1
+    },
+    "_meta": {
+      "title": "Subject Blend | Unclipped Wardrobe Blend"
+    }
+  },
+  "25": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "clip": [
+        "8",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ],
+      "audio_vae": [
+        "10",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "150",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "207",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "209",
+        0
+      ],
+      "ref_images.ref_image_3": [
+        "211",
+        0
+      ],
+      "ref_images.ref_image_4": [
+        "213",
+        0
+      ],
+      "ref_videos.ref_video_0": [
+        "181",
+        0
+      ],
+      "prompt": [
+        "89",
+        0
+      ],
+      "width": [
+        "20",
+        1
+      ],
+      "height": [
+        "20",
+        2
+      ],
+      "length": [
+        "20",
+        3
+      ],
+      "ref_image_size": "match"
+    },
+    "_meta": {
+      "title": "Ref2VA | Selected Pictures + Motion"
+    }
+  },
+  "26": {
+    "class_type": "NKDAVLatent",
+    "inputs": {
+      "images": [
+        "20",
+        0
+      ],
+      "audio": [
+        "12",
+        4
+      ],
+      "video_vae": [
+        "9",
+        0
+      ],
+      "audio_vae": [
+        "10",
+        0
+      ],
+      "latent_mask": [
+        "23",
+        2
+      ],
+      "fps": [
+        "12",
+        9
+      ],
+      "audio_mode": "keep",
+      "ramp_ticks": 0,
+      "ramp_out_ticks": 0,
+      "ramp_shape": "cosine"
+    },
+    "_meta": {
+      "title": "Prepare AV Latent | Keep Audio"
+    }
+  },
+  "28": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 20261002,
+      "control_after_generate": "fixed"
+    },
+    "_meta": {
+      "title": "Generation Seed"
+    }
+  },
+  "29": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "conditioning": [
+        "25",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Guider | CFG 1"
+    }
+  },
+  "30": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "_meta": {
+      "title": "res_multistep | TaoMate 3-Step"
+    }
+  },
+  "32": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "28",
+        0
+      ],
+      "guider": [
+        "29",
+        0
+      ],
+      "sampler": [
+        "30",
+        0
+      ],
+      "sigmas": [
+        "311",
+        0
+      ],
+      "latent_image": [
+        "26",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Generate Video | 3 TaoMate Steps"
+    }
+  },
+  "34": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "32",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode Generated Frames"
+    }
+  },
+  "35": {
+    "class_type": "MVEx_SubjectUncrop",
+    "inputs": {
+      "cropped_images": [
+        "34",
+        0
+      ],
+      "original_images": [
+        "305",
+        0
+      ],
+      "bboxes": [
+        "19",
+        2
+      ],
+      "cropped_masks": [
+        "24",
+        0
+      ],
+      "feather": 24,
+      "resize_method": "auto"
+    },
+    "_meta": {
+      "title": "Return to the Source Canvas"
+    }
+  },
+  "80": {
+    "class_type": "INTConstant",
+    "inputs": {
+      "value": 30
+    },
+    "_meta": {
+      "title": "Mask Preview Frame"
+    }
+  },
+  "81": {
+    "class_type": "GetImageRangeFromBatch",
+    "inputs": {
+      "images": [
+        "19",
+        0
+      ],
+      "masks": [
+        "19",
+        1
+      ],
+      "start_index": [
+        "80",
+        0
+      ],
+      "num_frames": 1
+    },
+    "_meta": {
+      "title": "Subject Preview Frame"
+    }
+  },
+  "82": {
+    "class_type": "GetImageRangeFromBatch",
+    "inputs": {
+      "masks": [
+        "24",
+        0
+      ],
+      "start_index": [
+        "80",
+        0
+      ],
+      "num_frames": 1
+    },
+    "_meta": {
+      "title": "Blend Preview Frame"
+    }
+  },
+  "85": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "300",
+        0
+      ],
+      "audio": [
+        "12",
+        4
+      ],
+      "frame_rate": [
+        "12",
+        9
+      ],
+      "loop_count": 0,
+      "filename_prefix": "yt_minimax_sapphire_dress_full",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 18,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "videopreview": {
+        "hidden": false,
+        "paused": false,
+        "params": {
+          "filename": "Minimax H3 3-Step Inpainting_00001-audio.mp4",
+          "subfolder": "MiniMax H3 3-Step Inpainting",
+          "type": "output",
+          "format": "video/h264-mp4",
+          "frame_rate": 24,
+          "workflow": "Minimax H3 3-Step Inpainting_00001.png",
+          "fullpath": "C:\\Comfy UI\\ComfyUI_windows_portable\\ComfyUI\\output\\MiniMax H3 3-Step Inpainting\\Minimax H3 3-Step Inpainting_00001-audio.mp4"
+        }
+      }
+    },
+    "_meta": {
+      "title": "Save Replacement | Original Audio"
+    }
+  },
+  "89": {
+    "class_type": "MiniMaxH3XPromptLint",
+    "inputs": {
+      "duration_seconds": [
+        "12",
+        11
+      ],
+      "ref_images": 1,
+      "prompt": "subject_definitions:\n<Subject 1> is the sapphire blue tailored blazer dress from <Picture 1>.\n<Video 1> is the source video being edited.\n\nsummary: [video editing + audio reuse]\nThe target video is an edited version of <Video 1>. Replace the woman's burgundy dress and arms with <Subject 1>. Each replacement is complete when its target first appears.\n\nretention_analysis:\n<Subject 1> (appears in [Shot 1]): fully_preserved - retain the royal sapphire blue color, smooth structured fabric, long tailored sleeves with gold cuff buttons, double-breasted gold button styling, and formal blazer dress silhouette. Replace the original burgundy dress and bare arms with this long-sleeved sapphire blazer dress.\n<Video 1>: weak_reference - follow the original standing pose, body movement, speaking cadence, facial expressions, and hand gestures. Preserve the woman's exact facial identity, red-brown hair, green screen studio environment, and proportions.\n\ndetailed_description:\nPhotorealistic professional broadcast green screen studio. [Shot 1] The news anchor woman stands in front of the solid green screen background wearing the sapphire blue long-sleeved blazer dress. She speaks to the camera while gesturing naturally with her hands, following the movement of <Video 1>. Her facial identity, hair, head movements, and speech are completely preserved from <Video 1>. The sapphire blue dress with gold buttons fits cleanly over her body with crisp tailoring against the solid green chroma background.\n\noverall_soundscape:\nKeep the original source soundtrack synchronized with the action.\n\nnon_diegetic_music:\nRetain any music already present in the source soundtrack.",
+      "mode": "ref2va",
+      "ref_videos": 1,
+      "ref_audios": 0,
+      "raise_on_warning": false
+    },
+    "_meta": {
+      "title": "Edit Prompt | Name each active Picture"
+    }
+  },
+  "100": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view.jpg",
+      "upload": "image"
+    },
+    "_meta": {
+      "title": "Picture 1 | Choose Reference Image"
+    }
+  },
+  "102": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view.jpg",
+      "upload": "image"
+    },
+    "_meta": {
+      "title": "Picture 2 | Choose Reference Image"
+    }
+  },
+  "103": {
+    "class_type": "PrimitiveBoolean",
+    "inputs": {
+      "value": false
+    },
+    "_meta": {
+      "title": "Full Scene | ON = Skip Subject Tracking + Masks"
+    }
+  },
+  "108": {
+    "class_type": "ImpactInt",
+    "inputs": {
+      "value": 1
+    },
+    "_meta": {
+      "title": "Reference Count | Use First 1-5"
+    }
+  },
+  "114": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "305",
+        0
+      ],
+      "batch_index": 24,
+      "length": 1
+    },
+    "_meta": {
+      "title": "Compare | Source Frame"
+    }
+  },
+  "115": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "35",
+        0
+      ],
+      "batch_index": 24,
+      "length": 1
+    },
+    "_meta": {
+      "title": "Compare | Edited Frame"
+    }
+  },
+  "116": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "lora_name": "TaoMate-H3-3step-ComfyUI.safetensors",
+      "strength_model": 1
+    },
+    "_meta": {
+      "title": "TaoMate 3-Step LoRA | Ref2VA Experimental"
+    }
+  },
+  "130": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view.jpg",
+      "upload": "image"
+    },
+    "_meta": {
+      "title": "Picture 3 | Choose Reference Image"
+    }
+  },
+  "134": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view.jpg",
+      "upload": "image"
+    },
+    "_meta": {
+      "title": "Picture 4 | Choose Reference Image"
+    }
+  },
+  "138": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view.jpg",
+      "upload": "image"
+    },
+    "_meta": {
+      "title": "Picture 5 | Choose Reference Image"
+    }
+  },
+  "150": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "100",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 384,
+      "height": 0,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Reference Resize | Keep Aspect"
+    }
+  },
+  "151": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "102",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 0,
+      "height": 512,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Reference Resize | Keep Aspect"
+    }
+  },
+  "152": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "130",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 512,
+      "height": 0,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Reference Resize | Keep Aspect"
+    }
+  },
+  "153": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "134",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 384,
+      "height": 0,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Reference Resize | Keep Aspect"
+    }
+  },
+  "154": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "138",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 384,
+      "height": 0,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Reference Resize | Keep Aspect"
+    }
+  },
+  "181": {
+    "class_type": "ImageScaleToMaxDimension",
+    "inputs": {
+      "image": [
+        "305",
+        0
+      ],
+      "upscale_method": "area",
+      "largest_size": 512
+    },
+    "_meta": {
+      "title": "Motion Reference | Longest Side 512 px"
+    }
+  },
+  "207": {
+    "class_type": "ImpactSwitch",
+    "inputs": {
+      "select": [
+        "108",
+        0
+      ],
+      "input2": [
+        "151",
+        0
+      ],
+      "input3": [
+        "151",
+        0
+      ],
+      "input4": [
+        "151",
+        0
+      ],
+      "input5": [
+        "151",
+        0
+      ],
+      "sel_mode": true
+    },
+    "_meta": {
+      "title": "Picture 2 | Automatic Gate"
+    }
+  },
+  "209": {
+    "class_type": "ImpactSwitch",
+    "inputs": {
+      "select": [
+        "108",
+        0
+      ],
+      "input3": [
+        "152",
+        0
+      ],
+      "input4": [
+        "152",
+        0
+      ],
+      "input5": [
+        "152",
+        0
+      ],
+      "sel_mode": true
+    },
+    "_meta": {
+      "title": "Picture 3 | Automatic Gate"
+    }
+  },
+  "211": {
+    "class_type": "ImpactSwitch",
+    "inputs": {
+      "select": [
+        "108",
+        0
+      ],
+      "input4": [
+        "153",
+        0
+      ],
+      "input5": [
+        "153",
+        0
+      ],
+      "sel_mode": true
+    },
+    "_meta": {
+      "title": "Picture 4 | Automatic Gate"
+    }
+  },
+  "213": {
+    "class_type": "ImpactSwitch",
+    "inputs": {
+      "select": [
+        "108",
+        0
+      ],
+      "input5": [
+        "154",
+        0
+      ],
+      "sel_mode": true
+    },
+    "_meta": {
+      "title": "Picture 5 | Automatic Gate"
+    }
+  },
+  "214": {
+    "class_type": "ImpactControlBridge",
+    "inputs": {
+      "value": [
+        "103",
+        0
+      ],
+      "mode": false,
+      "behavior": "Stop"
+    },
+    "_meta": {
+      "title": "Skip Unused Subject Branch"
+    }
+  },
+  "300": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "35",
+        0
+      ],
+      "length": [
+        "12",
+        10
+      ],
+      "batch_index": 0
+    },
+    "_meta": {
+      "title": "Final Duration | Automatic source length"
+    }
+  },
+  "301": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "values.a": [
+        "12",
+        10
+      ],
+      "expression": "max(5, ceil((a - 5) / 17) * 17 + 5)"
+    },
+    "_meta": {
+      "title": "Auto | H3 frame alignment"
+    }
+  },
+  "302": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "12",
+        0
+      ],
+      "batch_index": -1,
+      "length": 1
+    },
+    "_meta": {
+      "title": "Auto | Last source frame"
+    }
+  },
+  "303": {
+    "class_type": "RepeatImageBatch",
+    "inputs": {
+      "image": [
+        "302",
+        0
+      ],
+      "amount": 16
+    },
+    "_meta": {
+      "title": "Auto | End-frame padding"
+    }
+  },
+  "304": {
+    "class_type": "BatchImagesNode",
+    "inputs": {
+      "images.image0": [
+        "12",
+        0
+      ],
+      "images.image1": [
+        "303",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Auto | Append end frames"
+    }
+  },
+  "305": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "304",
+        0
+      ],
+      "length": [
+        "301",
+        1
+      ],
+      "batch_index": 0
+    },
+    "_meta": {
+      "title": "Auto | H3 source frames"
+    }
+  },
+  "311": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.961165, 0.853333, 0.0"
+    },
+    "_meta": {
+      "title": "TaoMate | Three-Step Sigma Schedule"
+    }
+  }
+}

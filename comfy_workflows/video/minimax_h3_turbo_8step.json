@@ -1,0 +1,165 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load MiniMax H3 Model (INT8 Distilled)"
+    }
+  },
+  "1b": {
+    "inputs": {
+      "model": ["1", 0],
+      "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      "strength_model": 1.0
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "MiniMax Turbo 8-Step LoRA"
+    }
+  },
+  "2": {
+    "inputs": {
+      "model": ["1b", 0],
+      "shift_video": 6.0,
+      "shift_audio": 3.0
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "Model Sampling MiniMax H3"
+    }
+  },
+  "3": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load MiniMax CLIP (Qwen3-VL NVFP4)"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load Video VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load Audio VAE"
+    }
+  },
+  "6": {
+    "inputs": {
+      "image": "avatar.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Initial Keyframe"
+    }
+  },
+  "7": {
+    "inputs": {
+      "clip": ["3", 0],
+      "vae": ["4", 0],
+      "prompt": "News anchor Blaze Wilder standing poised against solid green chroma screen with no furniture, subtle natural breathing rhythm, calm poised posture, locked closed lips, steady eye gaze, photorealistic 8k broadcast studio lighting, cinematic 24fps.",
+      "width": 768,
+      "height": 1344,
+      "length": 97,
+      "first_frame": ["6", 0]
+    },
+    "class_type": "MiniMaxH3ImageToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Image to Video"
+    }
+  },
+  "8": {
+    "inputs": {
+      "conditioning": ["7", 0]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "Negative Conditioning (Zero Out)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "model": ["2", 0],
+      "positive": ["7", 0],
+      "negative": ["8", 0],
+      "latent_image": ["7", 1],
+      "seed": 42,
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler (8-Step Turbo)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "samples": ["9", 0],
+      "vae": ["4", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video Frames"
+    }
+  },
+  "10b": {
+    "inputs": {
+      "image_target": ["10", 0],
+      "image_ref": ["6", 0],
+      "method": "reinhard_lab_gpu",
+      "strength": 1.0,
+      "multithread": true
+    },
+    "class_type": "ColorMatchV2",
+    "_meta": {
+      "title": "GPU Frame Color & Lighting Match to Keyframe"
+    }
+  },
+  "11": {
+    "inputs": {
+      "samples": ["9", 0],
+      "vae": ["5", 0]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "Decode Audio Waveform"
+    }
+  },
+  "12": {
+    "inputs": {
+      "images": ["10b", 0],
+      "audio": ["11", 0],
+      "frame_rate": 24.0,
+      "fps": 24,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true,
+      "filename_prefix": "minimax_turbo_loop",
+      "format": "video/nvenc_h264-mp4",
+      "trim_to_audio": false
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine & Export"
+    }
+  }
+}

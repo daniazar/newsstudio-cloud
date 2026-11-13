@@ -1,0 +1,45 @@
+{
+  "totalGenerations": 4,
+  "populationSize": 6,
+  "initialBestFitness": 87,
+  "finalBestFitness": 98,
+  "bestGenome": {
+    "id": "genome_gen4_acrkv",
+    "generation": 4,
+    "cadenceWpm": 147,
+    "lightingColorTempK": 5259,
+    "cutIntervalSec": 2.8,
+    "audioDuckingDb": -17,
+    "vocalPitchShift": -0.3,
+    "brollZoomVelocity": 1.16,
+    "lowerThirdStyle": "cyber_glass",
+    "visualVibrance": 1.38,
+    "fitnessScore": 98
+  },
+  "generationLog": [
+    {
+      "generation": 1,
+      "bestFitness": 87,
+      "averageFitness": 83,
+      "dominantTraits": "Cadence: 176WPM | Cuts: 4.3s | Lighting: 5581K | Style: high_voltage"
+    },
+    {
+      "generation": 2,
+      "bestFitness": 95,
+      "averageFitness": 87,
+      "dominantTraits": "Cadence: 143WPM | Cuts: 2.8s | Lighting: 5259K | Style: cyber_glass"
+    },
+    {
+      "generation": 3,
+      "bestFitness": 95,
+      "averageFitness": 91,
+      "dominantTraits": "Cadence: 143WPM | Cuts: 2.8s | Lighting: 5259K | Style: cyber_glass"
+    },
+    {
+      "generation": 4,
+      "bestFitness": 98,
+      "averageFitness": 95,
+      "dominantTraits": "Cadence: 147WPM | Cuts: 2.8s | Lighting: 5259K | Style: cyber_glass"
+    }
+  ]
+}

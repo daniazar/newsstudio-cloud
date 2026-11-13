@@ -1,0 +1,204 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "hunyuanvideo1.5_720p_i2v_cfg_distilled_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load HunyuanVideo 1.5 Distilled FP8"
+    }
+  },
+  "2": {
+    "inputs": {
+      "model": ["1", 0],
+      "shift": 7.0
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "Model Sampling HunyuanVideo 1.5"
+    }
+  },
+  "3": {
+    "inputs": {
+      "clip_name1": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "clip_name2": "byt5_small_glyphxl_fp16.safetensors",
+      "type": "hunyuan_video_15",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "Load Dual CLIP (Qwen 2.5 VL + ByT5)"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "hunyuanvideo15_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load Video VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "clip_name": "sigclip_vision_patch14_384.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load CLIP Vision (SigCLIP)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "image": "avatar.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Initial Keyframe"
+    }
+  },
+  "7": {
+    "inputs": {
+      "clip_vision": ["5", 0],
+      "image": ["6", 0],
+      "crop": "none"
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "8": {
+    "inputs": {
+      "clip": ["3", 0],
+      "text": "Cinematic waist-up broadcast medium shot of news anchor Blaze Wilder standing poised against solid green chroma screen with no furniture, fitted cropped black leather moto jacket, black bandeau top, high-waisted leather pants, subtle natural breathing rhythm, calm poised posture, locked closed lips, strictly closed mouth, steady eye gaze, photorealistic 8k broadcast studio lighting, cinematic 24fps."
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Positive Prompt"
+    }
+  },
+  "9": {
+    "inputs": {
+      "clip": ["3", 0],
+      "text": "blurry, low quality, distorted, jitter, static, low resolution"
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    }
+  },
+  "10": {
+    "inputs": {
+      "positive": ["8", 0],
+      "negative": ["9", 0],
+      "vae": ["4", 0],
+      "start_image": ["6", 0],
+      "clip_vision_output": ["7", 0],
+      "width": 720,
+      "height": 1280,
+      "length": 97,
+      "batch_size": 1
+    },
+    "class_type": "HunyuanVideo15ImageToVideo",
+    "_meta": {
+      "title": "HunyuanVideo 1.5 Image to Video"
+    }
+  },
+  "11": {
+    "inputs": {
+      "model": ["2", 0],
+      "positive": ["10", 0],
+      "negative": ["10", 1],
+      "cfg": 1.0
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider (Distilled 1.0)"
+    }
+  },
+  "12": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSampler Select"
+    }
+  },
+  "13": {
+    "inputs": {
+      "model": ["2", 0],
+      "scheduler": "simple",
+      "steps": 8,
+      "denoise": 1.0
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Basic Scheduler (8 Steps Distilled)"
+    }
+  },
+  "14": {
+    "inputs": {
+      "noise_seed": 42
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "Random Noise"
+    }
+  },
+  "15": {
+    "inputs": {
+      "noise": ["14", 0],
+      "guider": ["11", 0],
+      "sampler": ["12", 0],
+      "sigmas": ["13", 0],
+      "latent_image": ["10", 2]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom Advanced"
+    }
+  },
+  "16": {
+    "inputs": {
+      "samples": ["15", 0],
+      "vae": ["4", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video Frames"
+    }
+  },
+  "16b": {
+    "inputs": {
+      "image_target": ["16", 0],
+      "image_ref": ["6", 0],
+      "method": "reinhard_lab_gpu",
+      "strength": 1.0,
+      "multithread": true
+    },
+    "class_type": "ColorMatchV2",
+    "_meta": {
+      "title": "GPU Frame Color & Lighting Match to Keyframe"
+    }
+  },
+  "17": {
+    "inputs": {
+      "images": ["16b", 0],
+      "frame_rate": 24.0,
+      "fps": 24.0,
+      "loop_count": 0,
+      "pingpong": false,
+      "save_output": true,
+      "filename_prefix": "hunyuan_1.5_distilled",
+      "format": "video/nvenc_h264-mp4"
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine & Export"
+    }
+  }
+}

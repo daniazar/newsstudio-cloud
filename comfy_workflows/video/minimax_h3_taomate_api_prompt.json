@@ -1,0 +1,740 @@
+{
+  "11": {
+    "class_type": "VHS_LoadVideo",
+    "inputs": {
+      "video": "ruby_burgundy_M1_loop_v1_audio.mp4",
+      "force_rate": 24.0,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 175,
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "None"
+    },
+    "_meta": {
+      "title": "Source Video (VHS)"
+    }
+  },
+  "12": {
+    "class_type": "VHS_VideoInfoSource",
+    "inputs": {
+      "video_info": [
+        "11",
+        3
+      ]
+    },
+    "_meta": {
+      "title": "Source Video FPS"
+    }
+  },
+  "102": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sapphire_dress_3view_chroma.jpg"
+    },
+    "_meta": {
+      "title": "Wardrobe Reference (3-View Standalone)"
+    }
+  },
+  "9": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Video VAE"
+    }
+  },
+  "3": {
+    "class_type": "ModelAttentionBackend",
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "101",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Comfy Kitchen Attention"
+    }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Audio VAE"
+    }
+  },
+  "29": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "conditioning": [
+        "25",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "H3 Guider"
+    }
+  },
+  "28": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 2026082023,
+      "control_after_generate": "fixed"
+    },
+    "_meta": {
+      "title": "Test Seed (Fixed)"
+    }
+  },
+  "7": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "H3 Sigma Shift (Video 12 / Audio 3)"
+    }
+  },
+  "19": {
+    "class_type": "MVEx_SubjectCrop",
+    "inputs": {
+      "mode": "tracked",
+      "mode.crop_scale": 1.6,
+      "mode.padding": "firm",
+      "mode.prefer": "stillness",
+      "mode.aspect_ratio": 0.0,
+      "mode.seamless_loop": false,
+      "divisible_by": 32,
+      "upscale_megapixels": -0.18,
+      "original_images": [
+        "11",
+        0
+      ],
+      "masks": [
+        "17",
+        0
+      ],
+      "resize_method": "auto"
+    },
+    "_meta": {
+      "title": "Tracked Edit Crop (~0.18 MP)"
+    }
+  },
+  "13": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+    },
+    "_meta": {
+      "title": "SAM3.1 Tracker Model"
+    }
+  },
+  "80": {
+    "class_type": "INTConstant",
+    "inputs": {
+      "value": 30
+    },
+    "_meta": {
+      "title": "Preview Frame Index"
+    }
+  },
+  "17": {
+    "class_type": "VRAM_Debug",
+    "inputs": {
+      "empty_cache": true,
+      "gc_collect": true,
+      "unload_all_models": true,
+      "any_input": [
+        "162",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Unload SAM3"
+    }
+  },
+  "18": {
+    "class_type": "MVEx_MaskCleanup",
+    "inputs": {
+      "threshold": 0.5,
+      "method": "shrink_grow",
+      "method.shrink": 1,
+      "method.min_frames": 1,
+      "edge_grow": 0,
+      "masks": [
+        "16",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Clean Tracking Mask"
+    }
+  },
+  "2": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "MiniMax H3 Ref2VA Q4 GGUF Model"
+    }
+  },
+  "25": {
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "inputs": {
+      "prompt": [
+        "89",
+        0
+      ],
+      "width": [
+        "20",
+        1
+      ],
+      "height": [
+        "20",
+        2
+      ],
+      "length": [
+        "20",
+        3
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "8",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ],
+      "audio_vae": [
+        "10",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "102",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Prompt-Only Ref2VA Inpaint Conditioning"
+    }
+  },
+  "26": {
+    "class_type": "NKDAVLatent",
+    "inputs": {
+      "audio_mode": "keep",
+      "fps": [
+        "12",
+        0
+      ],
+      "ramp_ticks": 0,
+      "ramp_out_ticks": 0,
+      "ramp_shape": "cosine",
+      "images": [
+        "20",
+        0
+      ],
+      "audio": [
+        "11",
+        2
+      ],
+      "video_vae": [
+        "9",
+        0
+      ],
+      "audio_vae": [
+        "10",
+        0
+      ],
+      "latent_mask": [
+        "23",
+        2
+      ]
+    },
+    "_meta": {
+      "title": "Masked AV Latent (Source Audio)"
+    }
+  },
+  "32": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "28",
+        0
+      ],
+      "guider": [
+        "29",
+        0
+      ],
+      "sampler": [
+        "30",
+        0
+      ],
+      "sigmas": [
+        "31",
+        0
+      ],
+      "latent_image": [
+        "26",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Sampling"
+    }
+  },
+  "8": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen3-VL H3 Text Encoder"
+    }
+  },
+  "33": {
+    "class_type": "VRAM_Debug",
+    "inputs": {
+      "empty_cache": true,
+      "gc_collect": true,
+      "unload_all_models": true,
+      "any_input": [
+        "32",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Unload H3"
+    }
+  },
+  "34": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "33",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode Edited Crop"
+    }
+  },
+  "35": {
+    "class_type": "MVEx_SubjectUncrop",
+    "inputs": {
+      "feather": 2,
+      "cropped_images": [
+        "34",
+        0
+      ],
+      "original_images": [
+        "11",
+        0
+      ],
+      "bboxes": [
+        "19",
+        2
+      ],
+      "cropped_masks": [
+        "24",
+        0
+      ],
+      "resize_method": "auto"
+    },
+    "_meta": {
+      "title": "Composite into Source Frames"
+    }
+  },
+  "81": {
+    "class_type": "GetImageRangeFromBatch",
+    "inputs": {
+      "start_index": [
+        "80",
+        0
+      ],
+      "num_frames": 1,
+      "images": [
+        "19",
+        0
+      ],
+      "masks": [
+        "19",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Select Tracking Preview Frame"
+    }
+  },
+  "82": {
+    "class_type": "GetImageRangeFromBatch",
+    "inputs": {
+      "start_index": [
+        "80",
+        0
+      ],
+      "num_frames": 1,
+      "masks": [
+        "24",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Select Composite Preview Frame"
+    }
+  },
+  "24": {
+    "class_type": "NKDMaskOpsLean",
+    "inputs": {
+      "fill_holes": false,
+      "expand": 0,
+      "feather": 2,
+      "mask": [
+        "19",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Feathered Composite Mask"
+    }
+  },
+  "20": {
+    "class_type": "GetImageSizeAndCount",
+    "inputs": {
+      "image": [
+        "19",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Crop Size and Frame Count"
+    }
+  },
+  "23": {
+    "class_type": "NKDMaskOps",
+    "inputs": {
+      "invert": false,
+      "black_point": 0.5,
+      "white_point": 0.5,
+      "despeckle": 2,
+      "fill_holes": false,
+      "close_gaps": 0,
+      "temporal_expand": 0,
+      "temporal_smooth": 2,
+      "expand": 0,
+      "blockify": 0,
+      "blockify_threshold": 0.05,
+      "feather": 0,
+      "edge_low": 0,
+      "edge_high": 1,
+      "mask": [
+        "19",
+        1
+      ],
+      "vae": [
+        "9",
+        0
+      ],
+      "model": [
+        "7",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "H3-Aligned Update Mask"
+    }
+  },
+  "85": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "frame_rate": [
+        "12",
+        0
+      ],
+      "loop_count": 0,
+      "filename_prefix": "Ruby_Sapphire_Blazer_TaoMate3Step/Ruby_Sapphire_Blazer",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 18,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "videopreview": {
+        "hidden": false,
+        "paused": false,
+        "params": {
+          "filename": "Minimax H3 Inpainting_00089-audio.mp4",
+          "subfolder": "Minimax H3 Inpainting",
+          "type": "output",
+          "format": "video/nvenc_av1-mp4",
+          "frame_rate": 24,
+          "workflow": "Minimax H3 Inpainting_00089.png",
+          "fullpath": "C:\\Comfy UI\\ComfyUI_windows_portable\\ComfyUI\\output\\Minimax H3 Inpainting\\Minimax H3 Inpainting_00089-audio.mp4"
+        }
+      },
+      "images": [
+        "35",
+        0
+      ],
+      "audio": [
+        "11",
+        2
+      ]
+    },
+    "_meta": {
+      "title": "VHS_VideoCombine"
+    }
+  },
+  "4": {
+    "class_type": "MiniMaxChunkFeedForward",
+    "inputs": {
+      "chunks": 8,
+      "seq_threshold": 2048,
+      "model": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Feed-Forward Chunking (4)"
+    }
+  },
+  "5": {
+    "class_type": "MiniMaxLowVRAMAttention",
+    "inputs": {
+      "head_chunks": 8,
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Attention Head Chunking (4)"
+    }
+  },
+  "30": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "_meta": {
+      "title": "Sampler (RES Multistep)"
+    }
+  },
+  "31": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 2,
+      "denoise": 1.0,
+      "model": [
+        "7",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Scheduler (TaoMate 3 Steps)"
+    }
+  },
+  "16": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "object_indices": "0",
+      "track_data": [
+        "15",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3_TrackToMask"
+    }
+  },
+  "15": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "detection_threshold": 0.15,
+      "max_objects": 4,
+      "detect_interval": 1,
+      "images": [
+        "11",
+        0
+      ],
+      "model": [
+        "13",
+        0
+      ],
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3_VideoTrack"
+    }
+  },
+  "14": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "burgundy dress, burgundy velvet fabric, bodice, waist, skirt, hemline",
+      "clip": [
+        "13",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Tracking Prompt"
+    }
+  },
+  "89": {
+    "class_type": "MiniMaxH3XPromptLint",
+    "inputs": {
+      "prompt": "<Picture 1> chic royal sapphire blue tailored sleeveless double-breasted blazer vest dress, satin peak lapels, gold crest buttons, clean crisp luxury fabric, photorealistic 8k broadcast studio lighting",
+      "mode": "ref2va",
+      "duration_seconds": 8,
+      "ref_images": 1,
+      "ref_videos": 0,
+      "ref_audios": 0,
+      "raise_on_warning": false
+    },
+    "_meta": {
+      "title": "MiniMax H3 Prompt Lint"
+    }
+  },
+  "101": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "lora_name": "taomate_h3_3step_MAXQUALITY_bf16.safetensors",
+      "strength_model": 1.0,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "TaoMate-H3 3-Step Distilled LoRA"
+    }
+  },
+  "140": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "arms and hands",
+      "clip": [
+        "13",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Arms & Hands Exclusion Prompt"
+    }
+  },
+  "150": {
+    "class_type": "SAM3_VideoTrack",
+    "inputs": {
+      "images": [
+        "11",
+        0
+      ],
+      "model": [
+        "13",
+        0
+      ],
+      "detection_threshold": 0.15,
+      "max_objects": 8,
+      "detect_interval": 1,
+      "conditioning": [
+        "140",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SAM3 Arms & Hands Tracker"
+    }
+  },
+  "160": {
+    "class_type": "SAM3_TrackToMask",
+    "inputs": {
+      "track_data": [
+        "150",
+        0
+      ],
+      "object_indices": ""
+    },
+    "_meta": {
+      "title": "SAM3 Arms & Hands Mask"
+    }
+  },
+  "163": {
+    "class_type": "GrowMask",
+    "inputs": {
+      "mask": [
+        "16",
+        0
+      ],
+      "expand": 9,
+      "tapered_corners": true
+    },
+    "_meta": {
+      "title": "Grow Dress Mask Outward (+9px)"
+    }
+  },
+  "161": {
+    "class_type": "GrowMaskWithBlur",
+    "inputs": {
+      "mask": [
+        "160",
+        0
+      ],
+      "expand": 4,
+      "blur_radius": 1.0,
+      "fill_holes": true,
+      "tapered_corners": true,
+      "incremental_expandrate": 0.0,
+      "flip_input": false,
+      "lerp_alpha": 1.0,
+      "decay_factor": 1.0
+    },
+    "_meta": {
+      "title": "Grow Arms & Hands Mask With Blur"
+    }
+  },
+  "162": {
+    "class_type": "MaskComposite",
+    "inputs": {
+      "destination": [
+        "163",
+        0
+      ],
+      "source": [
+        "161",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "operation": "subtract"
+    },
+    "_meta": {
+      "title": "Subtracted Inpainting Mask (Dress MINUS Arms/Hands)"
+    }
+  }
+}
