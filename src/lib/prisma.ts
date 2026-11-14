@@ -9,7 +9,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.NEXT_PHASE !== "phase-production-build" &&
+    !process.env.DATABASE_URL
+  ) {
     throw new Error("DATABASE_URL environment variable is required in production");
   }
 

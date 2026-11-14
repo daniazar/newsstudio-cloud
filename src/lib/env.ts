@@ -86,8 +86,8 @@ function parseEnv(): AppConfig {
     IS_PROD: nodeEnv === "production",
   };
 
-  // Production integrity validations
-  if (nodeEnv === "production") {
+  // Production integrity validations (skip build-time phase when runtime secrets are injected later)
+  if (nodeEnv === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
     if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
       throw new Error("ENCRYPTION_KEY must be a 32+ character secret in production");
     }
