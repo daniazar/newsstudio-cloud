@@ -57,6 +57,7 @@ export const isPublicRoute = createPathMatcher([
   "/api/webhooks(.*)",
   "/api/piper/inspect",
   "/api/pipeline(.*)",
+  "/api/worker(.*)",
   "/api/ingest(.*)",
   "/api/ecommerce/turntable-3d(.*)/worker-update",
 ]);
