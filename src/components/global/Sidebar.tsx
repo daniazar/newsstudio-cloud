@@ -37,6 +37,7 @@ import {
   Box,
 } from "lucide-react";
 import { NotificationDropdown } from "./NotificationDropdown";
+import { PaletteSwitcher } from "./PaletteSwitcher";
 import { usePolling } from "@/lib/hooks/usePolling";
 import {
   useCachedSuperAdmin,
@@ -461,8 +462,9 @@ export const Sidebar = React.memo(function Sidebar() {
           ))}
         </div>
 
-        {/* Footer: Live Health Indicator Grid */}
+        {/* Footer: Palette picker + Live Health Indicator Grid */}
         <div className="p-3 border-t border-border/80 space-y-2 bg-black/20">
+          <PaletteSwitcher />
           <div className="p-2.5 rounded-xl border border-border/70 bg-surface/60 space-y-2">
             <div className="flex items-center justify-between text-[9px] font-mono font-bold text-muted uppercase tracking-wider">
               <span>Cluster Engines</span>
