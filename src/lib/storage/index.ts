@@ -13,7 +13,7 @@ const log = createLogger("storage");
 function createStorageClient(): StorageClient {
   const provider = env.STORAGE_PROVIDER;
 
-  if (env.IS_PROD && provider === "local") {
+  if (env.IS_PROD && process.env.NEXT_PHASE !== "phase-production-build" && provider === "local") {
     throw new Error(
       "STORAGE_PROVIDER=local is not allowed in production. Set STORAGE_PROVIDER to 'r2', 'minio', or 'azure'."
     );
