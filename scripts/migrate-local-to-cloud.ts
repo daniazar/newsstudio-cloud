@@ -14,13 +14,18 @@ import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import pg from "pg";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "../src/lib/prisma";
 import { PERSONAS } from "../src/lib/tts/personas";
 
+const args = new Set(process.argv.slice(2));
+const R2_ONLY = args.has("--r2-only");
+const DB_ONLY = args.has("--db-only");
+
 // Required environment variables for cloud migration
-const REQUIRED_ENV = [
-  "DATABASE_URL",
+const REQUIRED_DB_ENV = ["DATABASE_URL"];
+const REQUIRED_R2_ENV = [
   "S3_ENDPOINT",
   "S3_ACCESS_KEY",
   "S3_SECRET_KEY",
@@ -29,9 +34,13 @@ const REQUIRED_ENV = [
 
 function validateEnv(): void {
   console.log("🔍 [1/5] Validating Cloud Infrastructure Environment Variables...");
+  const required = [
+    ...(R2_ONLY ? [] : REQUIRED_DB_ENV),
+    ...(DB_ONLY ? [] : REQUIRED_R2_ENV),
+  ];
   const missing: string[] = [];
 
-  for (const envVar of REQUIRED_ENV) {
+  for (const envVar of required) {
     if (!process.env[envVar] || process.env[envVar]!.trim() === "") {
       missing.push(envVar);
     }
@@ -43,26 +52,91 @@ function validateEnv(): void {
     process.exit(1);
   }
 
-  console.log("   ✅ Supabase PostgreSQL and Cloudflare R2 credentials verified.");
+  console.log("   ✅ Required cloud credentials verified.");
 }
 
-function pushDatabaseSchema(): void {
-  console.log("\n🚀 [2/5] Pushing Prisma Schema to Supabase PostgreSQL...");
+async function applyAdditivePrismaSchema(): Promise<void> {
+  console.log("\n🚀 [2/5] Applying Additive-Only Prisma Schema to Supabase PostgreSQL...");
   const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!directUrl) {
+    throw new Error("DIRECT_URL or DATABASE_URL is required");
+  }
 
-  try {
-    execSync("npx prisma db push --accept-data-loss", {
-      stdio: "inherit",
+  const rawOutput = execSync(
+    "npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script",
+    {
+      encoding: "utf-8",
       env: {
         ...process.env,
         DATABASE_URL: directUrl,
       },
-    });
-    console.log("   ✅ Database schema pushed successfully.");
-  } catch (error) {
-    console.error("❌ Failed to push database schema to Supabase:", error);
-    throw error;
+    }
+  );
+
+  // Strip any non-SQL preamble printed by prisma.config.ts before the first DDL comment/statement
+  const sqlStart = rawOutput.search(/^(?:--|CREATE\s)/m);
+  const cleanSql = sqlStart >= 0 ? rawOutput.slice(sqlStart) : rawOutput;
+
+  // Split statements on semicolon line boundaries & strip comment-only chunks
+  const statements = cleanSql
+    .split(/;\s*\r?\n/)
+    .map((stmt) =>
+      stmt
+        .split(/\r?\n/)
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n")
+        .trim()
+    )
+    .filter((stmt) => stmt.length > 0);
+
+  for (const stmt of statements) {
+    if (/\b(DROP|TRUNCATE)\b/i.test(stmt)) {
+      throw new Error(`Unsafe destructive DDL detected and blocked: ${stmt.slice(0, 120)}`);
+    }
   }
+
+  const additiveStatements = statements.map((stmt) =>
+    stmt
+      .replace(/^CREATE TABLE\s+"/i, 'CREATE TABLE IF NOT EXISTS "')
+      .replace(/^CREATE UNIQUE INDEX\s+"/i, 'CREATE UNIQUE INDEX IF NOT EXISTS "')
+      .replace(/^CREATE INDEX\s+"/i, 'CREATE INDEX IF NOT EXISTS "')
+  );
+
+  const client = new pg.Client({
+    connectionString: directUrl,
+    ssl: directUrl.includes("localhost") || directUrl.includes("127.0.0.1")
+      ? undefined
+      : { rejectUnauthorized: false },
+  });
+
+  await client.connect();
+  let executed = 0;
+  let skippedExisting = 0;
+
+  try {
+    for (const stmt of additiveStatements) {
+      try {
+        await client.query(stmt);
+        executed++;
+      } catch (err: unknown) {
+        const pgErr = err as { code?: string; message?: string };
+        // 42710: duplicate_object (e.g. ALTER TABLE ADD CONSTRAINT already exists)
+        // 42P07: duplicate_table
+        if (pgErr.code === "42710" || pgErr.code === "42P07") {
+          skippedExisting++;
+          continue;
+        }
+        console.error(`❌ Failed DDL statement:\n${stmt}`);
+        throw err;
+      }
+    }
+  } finally {
+    await client.end();
+  }
+
+  console.log(
+    `   ✅ Additive schema sync complete (${executed} statements applied, ${skippedExisting} existing constraints/objects skipped).`
+  );
 }
 
 function seedPersonasAndBrand(): void {
@@ -125,7 +199,13 @@ async function seedVisualPresets(): Promise<void> {
     return;
   }
 
-  console.log(`   Inserting ${presets.length} presets in chunks of 500...`);
+  const existingCount = await prisma.visualPreset.count();
+  if (existingCount >= presets.length) {
+    console.log(`   ✅ Visual presets already seeded (${existingCount}/${presets.length}). Skipping duplicate insert.`);
+    return;
+  }
+
+  console.log(`   Inserting ${presets.length} presets in chunks of 500 (currently ${existingCount} in DB)...`);
   const chunkSize = 500;
   let inserted = 0;
 
@@ -161,6 +241,16 @@ async function uploadAvatarsToR2(): Promise<void> {
   const secretAccessKey = process.env.S3_SECRET_KEY!;
   const bucketName = process.env.S3_BUCKET_NAME!;
   const region = process.env.S3_REGION || "auto";
+  const keyPrefix = (process.env.S3_KEY_PREFIX || "").trim().replace(/^\/+|\/+$/g, "");
+  const prefixKey = (k: string): string => {
+    const clean = k.replace(/^\/+/, "");
+    if (!keyPrefix || clean.startsWith(`${keyPrefix}/`)) return clean;
+    return `${keyPrefix}/${clean}`;
+  };
+
+  if (keyPrefix) {
+    console.log(`   Using isolated R2 key prefix: "${keyPrefix}/" in bucket "${bucketName}"`);
+  }
 
   const s3 = new S3Client({
     region,
@@ -191,7 +281,7 @@ async function uploadAvatarsToR2(): Promise<void> {
   if (avatarsDir) {
     console.log(`   Scanning avatars directory: ${avatarsDir}`);
 
-    const personaIds = new Set(Object.keys(PERSONAS));
+    const personaIds = new Set(PERSONAS.map((p) => p.id.toLowerCase()));
 
     // 1. Root persona .png master files (abigail.png, ruby.png, etc.)
     const rootEntries = fs.readdirSync(avatarsDir, { withFileTypes: true });
@@ -202,7 +292,7 @@ async function uploadAvatarsToR2(): Promise<void> {
         if (personaIds.has(baseName) || !entry.name.includes("_")) {
           filesToUpload.push({
             localPath: path.join(avatarsDir, entry.name),
-            r2Key: `avatars/${entry.name}`,
+            r2Key: prefixKey(`avatars/${entry.name}`),
             contentType: "image/png",
           });
         }
@@ -224,7 +314,7 @@ async function uploadAvatarsToR2(): Promise<void> {
           const relativeToAvatars = path.relative(avatarsDir!, fullPath).replace(/\\/g, "/");
           filesToUpload.push({
             localPath: fullPath,
-            r2Key: `avatars/${relativeToAvatars}`,
+            r2Key: prefixKey(`avatars/${relativeToAvatars}`),
             contentType: "image/webp",
           });
         }
@@ -246,13 +336,13 @@ async function uploadAvatarsToR2(): Promise<void> {
     if (fs.existsSync(ph)) {
       filesToUpload.push({
         localPath: ph,
-        r2Key: "avatars/placeholder_ruby.png",
+        r2Key: prefixKey("avatars/placeholder_ruby.png"),
         contentType: "image/png",
       });
       // Also upload to root key so both URL styles resolve
       filesToUpload.push({
         localPath: ph,
-        r2Key: "placeholder_ruby.png",
+        r2Key: prefixKey("placeholder_ruby.png"),
         contentType: "image/png",
       });
       break;
@@ -286,7 +376,7 @@ async function uploadAvatarsToR2(): Promise<void> {
           );
           skippedCount++;
           continue;
-        } catch (headErr: any) {
+        } catch {
           // Object doesn't exist, proceed with upload
         }
 
@@ -331,10 +421,14 @@ async function main() {
   console.log("================================================================================\n");
 
   validateEnv();
-  pushDatabaseSchema();
-  seedPersonasAndBrand();
-  await seedVisualPresets();
-  await uploadAvatarsToR2();
+  if (!R2_ONLY) {
+    await applyAdditivePrismaSchema();
+    seedPersonasAndBrand();
+    await seedVisualPresets();
+  }
+  if (!DB_ONLY) {
+    await uploadAvatarsToR2();
+  }
 
   console.log("\n================================================================================");
   console.log("🎉 Cloud Migration Finished Successfully!");

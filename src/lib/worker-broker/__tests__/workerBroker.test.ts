@@ -10,6 +10,8 @@ import {
   completeLlmTask,
   resetLlmBrokerForTests,
   LlmBrokerTimeoutError,
+  parseAgyJsonLine,
+  resolveAgyModel,
 } from "@/lib/worker-broker";
 import { generateLlmText, generateLlmObject } from "@/lib/llm/aiSdkGateway";
 import * as tokenTracker from "@/lib/llm/tokenTracker";
@@ -245,5 +247,34 @@ describe("worker-broker: llmBroker & aiSdkGateway", () => {
 
     expect(res.object).toEqual({ headline: "Breaking News", score: 9 });
     expect(res.providerUsed).toBe("agy");
+  });
+
+  it("parseAgyJsonLine extracts response/structured_output and resolveAgyModel sanitizes API model names", () => {
+    delete process.env.AGY_MODEL;
+    expect(resolveAgyModel("gemini-2.5-flash")).toBe("gemini-3.8-flash-low");
+    expect(resolveAgyModel("gemini-4-hydrogen-high")).toBe("gemini-4-hydrogen-high");
+
+    const plain = parseAgyJsonLine(
+      JSON.stringify({
+        status: "SUCCESS",
+        response: "PONG\n",
+        usage: { input_tokens: 100, output_tokens: 2 },
+      })
+    );
+    expect(plain).toEqual({ text: "PONG\n", inputTokens: 100, outputTokens: 2 });
+
+    const structured = parseAgyJsonLine(
+      JSON.stringify({
+        status: "SUCCESS",
+        response: '{"reply":"ok"}',
+        structured_output: { reply: "ok" },
+        usage: { input_tokens: 50, output_tokens: 5 },
+      })
+    );
+    expect(structured).toEqual({ text: '{"reply":"ok"}', inputTokens: 50, outputTokens: 5 });
+
+    expect(() =>
+      parseAgyJsonLine(JSON.stringify({ status: "ERROR", error: "quota exceeded" }))
+    ).toThrow(/quota exceeded/);
   });
 });

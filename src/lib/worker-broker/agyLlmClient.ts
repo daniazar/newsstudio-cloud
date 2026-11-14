@@ -38,7 +38,17 @@ function buildFullPrompt(prompt: string, systemPrompt?: string, hasSchema?: bool
   return parts.join("\n\n");
 }
 
-function parseAgyJsonLine(stdout: string): {
+const AGY_MODEL_PATTERN = /^(?:gemini-(?:3\.8|4-|pro-orchestrator)|claude-|gpt-oss-)/i;
+
+export function resolveAgyModel(requestedModel?: string): string {
+  const trimmed = requestedModel?.trim();
+  if (trimmed && AGY_MODEL_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+  return (process.env.AGY_MODEL || DEFAULT_AGY_MODEL).trim();
+}
+
+export function parseAgyJsonLine(stdout: string): {
   text: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -48,25 +58,32 @@ function parseAgyJsonLine(stdout: string): {
     .map((l) => l.trim())
     .filter((l) => l.startsWith("{"));
 
-  if (lines.length > 0) {
-    const last = lines[lines.length - 1];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
     try {
-      const parsed = JSON.parse(last) as {
+      const parsed = JSON.parse(line) as {
+        status?: unknown;
         is_error?: boolean;
         error?: unknown;
         structured_output?: unknown;
+        response?: unknown;
         result?: unknown;
         text?: unknown;
         usage?: { input_tokens?: number; output_tokens?: number };
       };
 
-      if (parsed.is_error) {
+      const isError =
+        parsed.is_error === true ||
+        (typeof parsed.status === "string" && parsed.status.toUpperCase() === "ERROR");
+      if (isError) {
         const msg =
           typeof parsed.error === "string"
             ? parsed.error
-            : typeof parsed.result === "string"
-              ? parsed.result
-              : last;
+            : typeof parsed.response === "string"
+              ? parsed.response
+              : typeof parsed.result === "string"
+                ? parsed.result
+                : line;
         throw new Error(`agy returned error: ${msg.slice(0, 400)}`);
       }
 
@@ -81,6 +98,14 @@ function parseAgyJsonLine(stdout: string): {
             ? parsed.structured_output
             : JSON.stringify(parsed.structured_output);
         return { text: serialized, inputTokens, outputTokens };
+      }
+
+      if (typeof parsed.response === "string") {
+        return { text: parsed.response, inputTokens, outputTokens };
+      }
+
+      if (parsed.response !== undefined && parsed.response !== null) {
+        return { text: JSON.stringify(parsed.response), inputTokens, outputTokens };
       }
 
       if (typeof parsed.result === "string") {
@@ -98,7 +123,7 @@ function parseAgyJsonLine(stdout: string): {
       if (err instanceof Error && err.message.startsWith("agy returned error:")) {
         throw err;
       }
-      // Fall through to raw stdout
+      // Fall through to earlier lines / raw stdout
     }
   }
 
@@ -114,7 +139,7 @@ function parseAgyJsonLine(stdout: string): {
  * directory so no workspace files or slash commands leak into context.
  */
 export async function runAgyCompletion(req: LocalLlmRequest): Promise<LocalLlmResponse> {
-  const model = (req.model || process.env.AGY_MODEL || DEFAULT_AGY_MODEL).trim();
+  const model = resolveAgyModel(req.model);
   const effort = (req.effort || process.env.AGY_EFFORT || DEFAULT_AGY_EFFORT).trim();
   const printTimeout = (process.env.AGY_LLM_TIMEOUT || DEFAULT_AGY_TIMEOUT).trim();
   const timeoutMs = req.timeoutMs ?? 120_000;
@@ -144,13 +169,13 @@ export async function runAgyCompletion(req: LocalLlmRequest): Promise<LocalLlmRe
       args.push("--json-schema", schemaFile);
     }
 
-    args.push(buildFullPrompt(req.prompt, req.systemPrompt, Boolean(req.schema)));
+    const fullPrompt = buildFullPrompt(req.prompt, req.systemPrompt, Boolean(req.schema));
 
     const stdout = await new Promise<string>((resolve, reject) => {
       const child = spawn(bin, args, {
         cwd: tmp,
         windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
       });
 
       let out = "";
@@ -197,6 +222,9 @@ export async function runAgyCompletion(req: LocalLlmRequest): Promise<LocalLlmRe
         }
         resolve(out);
       });
+
+      // Pipe prompt via stdin so agy runs non-interactively without CLI length limits
+      child.stdin?.end(fullPrompt, "utf8");
     });
 
     const parsed = parseAgyJsonLine(stdout);

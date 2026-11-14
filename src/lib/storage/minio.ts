@@ -12,29 +12,48 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "stream";
 
 export class MinioStorageClient implements StorageClient {
+  private getKeyPrefix(): string {
+    return (process.env.S3_KEY_PREFIX || "").trim().replace(/^\/+|\/+$/g, "");
+  }
+
+  private toLogicalKey(key: string): string {
+    const clean = key.replace(/^\/+/, "");
+    const prefix = this.getKeyPrefix();
+    if (prefix && clean.startsWith(`${prefix}/`)) {
+      return clean.slice(prefix.length + 1);
+    }
+    return clean;
+  }
+
+  private toBucketKey(key: string): string {
+    const logical = this.toLogicalKey(key);
+    const prefix = this.getKeyPrefix();
+    return prefix ? `${prefix}/${logical}` : logical;
+  }
+
   async upload(key: string, buffer: Buffer, contentType: string): Promise<string> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
       Body: buffer,
       ContentType: contentType,
     });
 
     await s3Client.send(command);
-    return this.getUrl(cleanKey);
+    return this.getUrl(key);
   }
 
   async download(key: string): Promise<Buffer> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
     });
 
     const response = await s3Client.send(command);
     if (!response.Body) {
-      throw new Error(`MinIO/S3 object has no content: ${cleanKey}`);
+      throw new Error(`MinIO/S3 object has no content: ${bucketKey}`);
     }
 
     // Convert readable stream to Buffer
@@ -47,32 +66,38 @@ export class MinioStorageClient implements StorageClient {
   }
 
   async createReadStream(key: string): Promise<Readable> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
     });
 
     const response = await s3Client.send(command);
     if (!response.Body) {
-      throw new Error(`MinIO/S3 object has no content: ${cleanKey}`);
+      throw new Error(`MinIO/S3 object has no content: ${bucketKey}`);
     }
     return response.Body as unknown as Readable;
   }
 
   getUrl(key: string): string {
-    const cleanKey = key.replace(/^\/+/, "");
+    const logical = this.toLogicalKey(key);
+    const bucketKey = this.toBucketKey(key);
+    const prefix = this.getKeyPrefix();
     const publicUrl = process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
     if (publicUrl) {
       // Cloudflare R2 pub-xxx.r2.dev or custom CDN domains map directly to bucket root
-      return `${publicUrl.replace(/\/+$/, "")}/${cleanKey}`;
+      const base = publicUrl.replace(/\/+$/, "");
+      if (prefix && base.endsWith(`/${prefix}`)) {
+        return `${base}/${logical}`;
+      }
+      return `${base}/${bucketKey}`;
     }
 
     const endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT || "http://localhost:9000";
     if (process.env.NODE_ENV === "production" && (endpoint.includes("localhost") || endpoint.includes("127.0.0.1"))) {
       throw new Error(`Invalid S3 endpoint in production: ${endpoint}. Set NEXT_PUBLIC_S3_PUBLIC_URL, NEXT_PUBLIC_S3_ENDPOINT, or S3_ENDPOINT to a public cloud URL.`);
     }
-    return `${endpoint.replace(/\/+$/, "")}/${BUCKET_NAME}/${cleanKey}`;
+    return `${endpoint.replace(/\/+$/, "")}/${BUCKET_NAME}/${bucketKey}`;
   }
 
   async getSignedUrl(key: string, expiresInSeconds: number = 3600): Promise<string> {
@@ -80,29 +105,29 @@ export class MinioStorageClient implements StorageClient {
   }
 
   async getPresignedUploadUrl(key: string, contentType: string, expiresInSeconds: number = 3600): Promise<string> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
       ContentType: contentType,
     });
     return await getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
   }
 
   async getPresignedReadUrl(key: string, expiresInSeconds: number = 3600): Promise<string> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
     });
     return await getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
   }
 
   async delete(key: string): Promise<void> {
-    const cleanKey = key.replace(/^\/+/, "");
+    const bucketKey = this.toBucketKey(key);
     const command = new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
-      Key: cleanKey,
+      Key: bucketKey,
     });
     await s3Client.send(command);
   }
@@ -115,7 +140,7 @@ export class MinioStorageClient implements StorageClient {
       const command = new DeleteObjectsCommand({
         Bucket: BUCKET_NAME,
         Delete: {
-          Objects: batch.map((Key) => ({ Key: Key.replace(/^\/+/, "") })),
+          Objects: batch.map((Key) => ({ Key: this.toBucketKey(Key) })),
           Quiet: true,
         },
       });
@@ -125,10 +150,10 @@ export class MinioStorageClient implements StorageClient {
 
   async exists(key: string): Promise<boolean> {
     try {
-      const cleanKey = key.replace(/^\/+/, "");
+      const bucketKey = this.toBucketKey(key);
       const command = new HeadObjectCommand({
         Bucket: BUCKET_NAME,
-        Key: cleanKey,
+        Key: bucketKey,
       });
       await s3Client.send(command);
       return true;
@@ -141,15 +166,22 @@ export class MinioStorageClient implements StorageClient {
     }
   }
 
-  async list(prefix?: string): Promise<StorageItem[]> {
+  async list(prefixArg?: string): Promise<StorageItem[]> {
+    const prefix = this.getKeyPrefix();
+    const s3Prefix = prefixArg
+      ? this.toBucketKey(prefixArg)
+      : prefix
+      ? `${prefix}/`
+      : undefined;
+
     const command = new ListObjectsV2Command({
       Bucket: BUCKET_NAME,
-      Prefix: prefix ? prefix.replace(/^\/+/, "") : undefined,
+      Prefix: s3Prefix,
     });
 
     const response = await s3Client.send(command);
     return (response.Contents || []).map((obj) => ({
-      key: obj.Key || "",
+      key: this.toLogicalKey(obj.Key || ""),
       size: obj.Size,
       lastModified: obj.LastModified,
     }));

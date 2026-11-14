@@ -196,5 +196,56 @@ describe("Storage Abstraction Layer", () => {
       expect(readUrl).toContain("tenants/org_1/renders/video.mp4");
       expect(readUrl).toContain("X-Amz-Signature");
     });
+
+    it("should isolate keys and public URLs under S3_KEY_PREFIX when sharing an R2 bucket", async () => {
+      const origPublic = process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
+      const origPrefix = process.env.S3_KEY_PREFIX;
+      try {
+        process.env.S3_KEY_PREFIX = "newsstudio";
+        const { MinioStorageClient } = await import("../minio");
+        const { s3Client } = await import("../s3Client");
+        const sendSpy = vi.spyOn(s3Client, "send").mockImplementation(async (cmd: unknown) => {
+          const name = (cmd as { constructor?: { name?: string } })?.constructor?.name;
+          if (name === "ListObjectsV2Command") {
+            return {
+              Contents: [{ Key: "newsstudio/avatars/ruby.png", Size: 1024 }],
+            } as never;
+          }
+          return {} as never;
+        });
+
+        const client = new MinioStorageClient();
+
+        // With /newsstudio suffix on public CDN URL, avoid duplicating prefix
+        process.env.NEXT_PUBLIC_S3_PUBLIC_URL = "https://pub-shared.r2.dev/newsstudio";
+        expect(client.getUrl("avatars/ruby.png")).toBe("https://pub-shared.r2.dev/newsstudio/avatars/ruby.png");
+        expect(client.getUrl("newsstudio/avatars/ruby.png")).toBe("https://pub-shared.r2.dev/newsstudio/avatars/ruby.png");
+
+        // Without suffix on public CDN URL, include prefix once
+        process.env.NEXT_PUBLIC_S3_PUBLIC_URL = "https://pub-shared.r2.dev";
+        expect(client.getUrl("avatars/ruby.png")).toBe("https://pub-shared.r2.dev/newsstudio/avatars/ruby.png");
+
+        // Upload & list & deleteMany use prefixed bucket keys while returning logical keys from list
+        const uploadedUrl = await client.upload("avatars/ruby.png", Buffer.from("png"), "image/png");
+        expect(uploadedUrl).toBe("https://pub-shared.r2.dev/newsstudio/avatars/ruby.png");
+        expect((sendSpy.mock.calls[0][0] as { input: { Key: string } }).input.Key).toBe("newsstudio/avatars/ruby.png");
+
+        const items = await client.list("avatars");
+        expect(items).toEqual([{ key: "avatars/ruby.png", size: 1024, lastModified: undefined }]);
+        expect((sendSpy.mock.calls[1][0] as { input: { Prefix: string } }).input.Prefix).toBe("newsstudio/avatars");
+
+        await client.deleteMany(["avatars/ruby.png"]);
+        expect(
+          (sendSpy.mock.calls[2][0] as { input: { Delete: { Objects: Array<{ Key: string }> } } }).input.Delete.Objects
+        ).toEqual([{ Key: "newsstudio/avatars/ruby.png" }]);
+
+        sendSpy.mockRestore();
+      } finally {
+        if (origPublic !== undefined) process.env.NEXT_PUBLIC_S3_PUBLIC_URL = origPublic;
+        else delete process.env.NEXT_PUBLIC_S3_PUBLIC_URL;
+        if (origPrefix !== undefined) process.env.S3_KEY_PREFIX = origPrefix;
+        else delete process.env.S3_KEY_PREFIX;
+      }
+    });
   });
 });

@@ -92,7 +92,12 @@ const handler = clerkMiddleware(
   async (auth, req) => {
     if (isPublicRoute(req)) return;
 
-    if (isProtectedAdminApi(req)) {
+    const configuredWorkerKey = process.env.WORKER_API_KEY;
+    const hasValidWorkerKey = Boolean(
+      configuredWorkerKey && req.headers.get("x-worker-key") === configuredWorkerKey
+    );
+
+    if (isProtectedAdminApi(req) && !hasValidWorkerKey) {
       await auth.protect();
       return;
     }

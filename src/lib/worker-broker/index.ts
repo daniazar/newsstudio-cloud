@@ -12,6 +12,8 @@ export {
 } from "./supabaseWake";
 
 export {
+  parseAgyJsonLine,
+  resolveAgyModel,
   runAgyCompletion,
   runOllamaCompletion,
   runLocalLlm,
