@@ -27,7 +27,18 @@ describe("worker-broker: supabaseWake", () => {
   it("resolveSupabaseConfigFromEnv returns null when env vars missing", () => {
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_ANON_KEY;
     expect(resolveSupabaseConfigFromEnv()).toBeNull();
+  });
+
+  it("resolveSupabaseConfigFromEnv falls back to SUPABASE_ANON_KEY when service role key is unset", () => {
+    process.env.SUPABASE_URL = "https://abc.supabase.co/";
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_ANON_KEY = "sb_publishable_123";
+    expect(resolveSupabaseConfigFromEnv()).toEqual({
+      url: "https://abc.supabase.co",
+      serviceRoleKey: "sb_publishable_123",
+    });
   });
 
   it("resolveSupabaseConfigFromEnv trims trailing slash and returns config", () => {

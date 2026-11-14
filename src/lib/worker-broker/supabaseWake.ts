@@ -15,11 +15,39 @@ export const WORKER_WAKE_EVENT = "wake";
 
 export function resolveSupabaseConfigFromEnv(): SupabaseWakeConfig | null {
   const url = (process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
-  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  const serviceRoleKey = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    ""
+  ).trim();
   if (!url || !serviceRoleKey) {
     return null;
   }
   return { url, serviceRoleKey };
+}
+
+async function queryPostgres<T = Record<string, unknown>>(sql: string): Promise<T[] | null> {
+  const connStr = (process.env.DATABASE_URL || "").trim();
+  if (!connStr) return null;
+
+  try {
+    const { Client } = await import("pg");
+    const isLocal = connStr.includes("localhost") || connStr.includes("127.0.0.1");
+    const client = new Client({
+      connectionString: connStr,
+      connectionTimeoutMillis: 5000,
+      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    });
+    await client.connect();
+    try {
+      const res = await client.query(sql);
+      return (res.rows as T[]) || [];
+    } finally {
+      await client.end().catch(() => {});
+    }
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -76,7 +104,20 @@ export async function checkSupabaseQueuedJobs(cfg: SupabaseWakeConfig): Promise<
       },
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return true; // Fail open so worker still checks Railway if REST errors
+    if (!res.ok) {
+      if (process.env.DATABASE_URL?.trim()) {
+        const pgRows = await queryPostgres<{ id: string }>(
+          `SELECT id FROM "GenerationJob" WHERE status = 'QUEUED' LIMIT 1`
+        );
+        if (pgRows !== null) {
+          return pgRows.length > 0;
+        }
+      }
+      if ((res.status === 401 || res.status === 403) && !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+        return false;
+      }
+      return true; // Fail open so worker still checks Railway if REST errors
+    }
     const rows = (await res.json()) as unknown;
     return Array.isArray(rows) && rows.length > 0;
   } catch {
@@ -104,7 +145,20 @@ export async function checkSupabaseDueSchedules(
       },
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      if (process.env.DATABASE_URL?.trim()) {
+        const pgRows = await queryPostgres<DueScheduleRow>(
+          `SELECT id, "companyId" FROM "Schedule" WHERE "isActive" = true AND "nextRunAt" IS NOT NULL AND "nextRunAt" <= NOW() LIMIT 10`
+        );
+        if (pgRows !== null) {
+          return pgRows.filter(
+            (r): r is DueScheduleRow =>
+              Boolean(r) && typeof r.id === "string" && typeof r.companyId === "string"
+          );
+        }
+      }
+      return [];
+    }
     const rows = (await res.json()) as unknown;
     if (!Array.isArray(rows)) return [];
     return rows.filter(
