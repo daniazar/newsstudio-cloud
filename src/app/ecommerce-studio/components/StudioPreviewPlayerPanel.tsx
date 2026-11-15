@@ -61,8 +61,10 @@ export const StudioPreviewPlayerPanel: React.FC<StudioPreviewPlayerPanelProps> =
             ref={playerRef}
             component={ProductAdComposition as unknown as React.ComponentType<Record<string, unknown>>}
             inputProps={{
+              productSpec: product,
               script,
-              product,
+              aspectRatio,
+              audioMode: "voiceover_tts",
             }}
             durationInFrames={Math.max(60, totalFrames)}
             compositionWidth={selectedConfig.width}

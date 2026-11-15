@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ByokManager } from "@/components/admin/ByokManager";
 import { TokenSpendDashboard } from "@/components/admin/TokenSpendDashboard";
+import { useCachedSuperAdmin } from "@/lib/hooks/useSidebarIdentity";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -43,7 +44,22 @@ interface AdminSettings {
 export default function AdminSettingsPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { toast } = useToast();
-  const isAdmin = isSignedIn && user?.publicMetadata?.role === "admin";
+  const cachedSuperAdmin = useCachedSuperAdmin();
+  const role = user?.publicMetadata?.role;
+  const hasMetadataAdminRole = role === "admin" || role === "superadmin";
+
+  const {
+    data: whoamiData,
+    error: whoamiError,
+    isLoading: isWhoamiLoading,
+  } = useSWR<{ isSuperAdmin?: boolean }>(
+    isLoaded && isSignedIn && !hasMetadataAdminRole ? "/api/admin/whoami" : null,
+    fetcher
+  );
+
+  const isAdmin = Boolean(
+    isSignedIn && (hasMetadataAdminRole || cachedSuperAdmin || whoamiData?.isSuperAdmin)
+  );
 
   const { data: initialSettings, mutate } = useSWR<AdminSettings>(
     isAdmin ? "/api/admin/settings" : null,
@@ -55,15 +71,25 @@ export default function AdminSettingsPage() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (initialSettings) {
+    if (initialSettings && typeof initialSettings === "object" && !("error" in initialSettings)) {
       setSettings(JSON.parse(JSON.stringify(initialSettings))); // Deep copy
     }
   }, [initialSettings]);
 
-  if (!isLoaded) {
+  const isCheckingAdminAccess = Boolean(
+    isLoaded &&
+      isSignedIn &&
+      !isAdmin &&
+      (isWhoamiLoading || (whoamiData === undefined && !whoamiError))
+  );
+
+  if (!isLoaded || isCheckingAdminAccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
         <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs text-muted font-medium">
+          {isCheckingAdminAccess ? "Verifying admin permissions..." : "Loading..."}
+        </span>
       </div>
     );
   }

@@ -3,7 +3,7 @@
 import { useToast } from "@/components/global/ToastContainer";
 import { compileAdScript } from "@/lib/ecommerce/adCopywriter";
 import { calculateProductReadiness } from "@/lib/ecommerce/readinessMatrix";
-import { SAMPLE_FLOORING,SAMPLE_PRODUCTS } from "@/lib/ecommerce/sampleProducts";
+import { SAMPLE_FLOORING } from "@/lib/ecommerce/sampleProducts";
 import { AdScene,TargetDistributionChannel,VideoArchetype } from "@/lib/types/ecommerce";
 import { PlayerRef } from "@remotion/player";
 import { usePathname,useRouter,useSearchParams } from "next/navigation";
@@ -39,7 +39,7 @@ function EcommerceStudioContent() {
   const _studioAudio = useEcommerceStudioAudio();
 
   const { data: storefrontsData, mutate: mutateStorefronts } = useSWR("/api/ecommerce/storefronts", fetcher);
-  const { data: catalogData, mutate: mutateCatalog } = useSWR("/api/ecommerce/catalog", fetcher);
+  const { data: catalogData, mutate: mutateCatalog } = useSWR("/api/ecommerce/products", fetcher);
 
   const harvester = useEcommerceStudioHarvester((newProduct) => {
     studioState.setProduct(newProduct);
@@ -108,7 +108,7 @@ function EcommerceStudioContent() {
         {studioState.activeLevel === "stores" && (
           <StorefrontsDirectoryView
             storefronts={storefrontsData?.storefronts || []}
-            allProducts={catalogData?.products || []}
+            allProducts={catalogData?.products ?? catalogData?.items ?? []}
             onSelectStore={() => studioState.setActiveLevel("products")}
             onSyncStore={async () => { await mutateStorefronts(); await mutateCatalog(); }}
             onAddStore={async () => { studioState.setActiveLevel("products"); }}
@@ -118,7 +118,7 @@ function EcommerceStudioContent() {
         {studioState.activeLevel === "products" && (
           <StoreCatalogView
             store={storefrontsData?.storefronts?.[0] || null}
-            products={catalogData?.products || SAMPLE_PRODUCTS}
+            products={catalogData?.products ?? catalogData?.items}
             onSelectProduct={(p) => {
               studioState.setProduct(p);
               const compiled = compileAdScript({ productSpec: p, archetype: "viral_ugc", targetChannel: "tiktok_shop" });
