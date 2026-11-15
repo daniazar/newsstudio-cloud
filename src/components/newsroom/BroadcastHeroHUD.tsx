@@ -1,7 +1,7 @@
 "use client";
 
 import { PERSONAS } from "@/lib/tts/personas";
-import { ArrowUpRight,RefreshCw,Sparkles,Video } from "lucide-react";
+import { ArrowUpRight, Mic, RefreshCw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 
@@ -141,13 +141,13 @@ export const BroadcastHeroHUD: React.FC<BroadcastHeroHUDProps> = ({
               </button>
             )}
 
-            {/* Interactive Call Button */}
+            {/* Voice Studio Button */}
             <Link
-              href="/interactive-call"
-              className="px-3.5 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 font-bold text-xs text-rose-300 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg shadow-rose-500/10"
+              href="/voice-studio"
+              className="px-3.5 py-2.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 font-bold text-xs text-cyan-300 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg shadow-cyan-500/10"
             >
-              <Video className="w-3.5 h-3.5 text-rose-400" />
-              <span>Live CVI Call</span>
+              <Mic className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Voice Studio</span>
             </Link>
           </div>
         </div>

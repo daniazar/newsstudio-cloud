@@ -5,6 +5,7 @@ import { useToast } from "@/components/global/ToastContainer";
 import { useInfiniteList } from "@/lib/hooks/useInfiniteList";
 import { Globe,LayoutGrid,List,Paintbrush,Plus,Search,Star,Upload,Users } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React,{ useEffect,useState } from "react";
 
@@ -454,68 +455,83 @@ export default function PersonasGalleryPage() {
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredPersonas.map((p) => (
-            <a
+            <div
               key={p.id}
-              href={`/personas/${p.slug}`}
               className="group relative flex flex-col rounded-3xl border border-border/80 glass-panel-raised overflow-hidden hover:border-emerald-500/50 shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
               {/* Photo Area */}
-              <div className="aspect-[4/5] w-full bg-surface-raised relative overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={getAvatarUrl(p)}
-                  alt={p.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+              <Link href={`/personas/${p.slug}`} className="block">
+                <div className="aspect-[4/5] w-full bg-surface-raised relative overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getAvatarUrl(p)}
+                    alt={p.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
 
-                {/* System Badge */}
-                <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-lg text-[9px] font-mono font-bold tracking-wider uppercase border backdrop-blur-md shadow ${
-                  p.isSystemPersona
-                    ? "bg-emerald-950/80 border-emerald-500/30 text-emerald-400"
-                    : "bg-sky-950/80 border-sky-500/30 text-sky-400"
-                }`}>
-                  {p.isSystemPersona ? "System" : "Clone"}
-                </span>
+                  {/* System Badge */}
+                  <span className={`absolute top-3 left-3 px-2 py-0.5 rounded-lg text-[9px] font-mono font-bold tracking-wider uppercase border backdrop-blur-md shadow ${
+                    p.isSystemPersona
+                      ? "bg-emerald-950/80 border-emerald-500/30 text-emerald-400"
+                      : "bg-sky-950/80 border-sky-500/30 text-sky-400"
+                  }`}>
+                    {p.isSystemPersona ? "System" : "Clone"}
+                  </span>
 
-                {/* State dot */}
-                <span className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full border border-background shadow-lg ${
-                  p.isActive ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-slate-600"
-                }`} />
+                  {/* State dot */}
+                  <span className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full border border-background shadow-lg ${
+                    p.isActive ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-slate-600"
+                  }`} />
 
-                {/* Info gradient overlay */}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/60 to-transparent p-4 flex flex-col justify-end pt-12">
-                  <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm">
-                      {p.role}
-                    </span>
-                    <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm flex items-center gap-1">
-                      <span>{getLanguageFlag(p.language)}</span>
-                      <span>{p.language}</span>
-                    </span>
-                    <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm" title={p.gender}>
-                      {p.gender === "female" ? "♀ F" : "♂ M"}
-                    </span>
+                  {/* Info gradient overlay */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/60 to-transparent p-4 flex flex-col justify-end pt-12">
+                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm">
+                        {p.role}
+                      </span>
+                      <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm flex items-center gap-1">
+                        <span>{getLanguageFlag(p.language)}</span>
+                        <span>{p.language}</span>
+                      </span>
+                      <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md bg-background/80 border border-border/60 text-subtle shadow-sm" title={p.gender}>
+                        {p.gender === "female" ? "♀ F" : "♂ M"}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-black text-foreground tracking-tight leading-none group-hover:text-emerald-300 transition-colors">
+                      {p.name}
+                    </h3>
                   </div>
-                  <h3 className="text-base font-black text-foreground tracking-tight leading-none group-hover:text-emerald-300 transition-colors">
-                    {p.name}
-                  </h3>
                 </div>
-              </div>
+              </Link>
 
               {/* Quick Launch Studios Toolbar */}
               <div className="px-3.5 py-2.5 bg-surface-raised/95 border-t border-white/5 flex items-center justify-between gap-1 text-[11px] text-subtle">
-                <span className="text-[9px] font-mono uppercase font-bold text-muted">Voice:</span>
-                <div className="flex items-center gap-1.5">
-                  <a
+                <span className="text-[9px] font-mono uppercase font-bold text-muted">Studios:</span>
+                <div className="flex items-center gap-2">
+                  <Link
                     href={`/voice-studio?personaId=${p.slug}`}
-                    onClick={(e) => e.stopPropagation()}
                     title="Voice Studio"
                     className="hover:scale-125 transition-transform"
                   >
                     🎙️
-                  </a>
+                  </Link>
+                  <Link
+                    href={`/ecommerce-studio?personaId=${p.slug}`}
+                    title="E-Commerce Studio"
+                    className="hover:scale-125 transition-transform"
+                  >
+                    🛍️
+                  </Link>
+                  <Link
+                    href="/newsroom"
+                    title="Newsroom Control Center"
+                    className="hover:scale-125 transition-transform"
+                  >
+                    📡
+                  </Link>
                 </div>
-              </div></a>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
@@ -563,63 +579,31 @@ export default function PersonasGalleryPage() {
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <div className="inline-flex items-center gap-1.5">
-                        <a
-                          href={`/wardrobe-studio?personaId=${p.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Wardrobe Studio"
-                          className="hover:scale-125 transition-transform"
-                        >
-                          👗
-                        </a>
-                        <a
+                      <div className="inline-flex items-center gap-2">
+                        <Link
                           href={`/voice-studio?personaId=${p.slug}`}
                           onClick={(e) => e.stopPropagation()}
                           title="Voice Studio"
                           className="hover:scale-125 transition-transform"
                         >
                           🎙️
-                        </a>
-                        <a
-                          href={`/field-reporter-studio?personaId=${p.slug}`}
+                        </Link>
+                        <Link
+                          href={`/ecommerce-studio?personaId=${p.slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          title="Field Reporter Studio"
+                          title="E-Commerce Studio"
                           className="hover:scale-125 transition-transform"
                         >
-                          🎥
-                        </a>
-                        <a
-                          href={`/roundtable-studio?anchor1=${p.slug}`}
+                          🛍️
+                        </Link>
+                        <Link
+                          href="/newsroom"
                           onClick={(e) => e.stopPropagation()}
-                          title="Roundtable Studio"
+                          title="Newsroom Control Center"
                           className="hover:scale-125 transition-transform"
                         >
-                          🏛️
-                        </a>
-                        <a
-                          href={`/interview-studio?host=${p.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Interview Studio"
-                          className="hover:scale-125 transition-transform"
-                        >
-                          🎬
-                        </a>
-                        <a
-                          href={`/vtuber-studio?personaId=${p.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="VTuber Studio"
-                          className="hover:scale-125 transition-transform"
-                        >
-                          ⚡
-                        </a>
-                        <a
-                          href={`/tools/thumbnail-builder?personaId=${p.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Thumbnail Builder"
-                          className="hover:scale-125 transition-transform"
-                        >
-                          🖼️
-                        </a>
+                          📡
+                        </Link>
                       </div>
                     </td>
                   </tr>

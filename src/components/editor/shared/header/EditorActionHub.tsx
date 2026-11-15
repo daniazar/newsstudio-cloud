@@ -18,7 +18,7 @@ import {
   Film,
   Shuffle,
   CheckCircle2,
-  Video,
+  Mic,
 } from "lucide-react";
 
 export type EditorMode = "simple" | "pro";
@@ -263,19 +263,19 @@ export function EditorActionHub({
               </button>
             )}
 
-            {/* Live CVI Call Bridge */}
+            {/* Voice Studio Bridge */}
             <Link
-              href={personaId ? `/interactive-call?persona=${encodeURIComponent(personaId)}` : "/interactive-call"}
+              href={personaId ? `/voice-studio?personaId=${encodeURIComponent(personaId)}` : "/voice-studio"}
               onClick={() => setAiMenuOpen(false)}
               className="w-full flex items-start gap-2.5 p-2 rounded-lg text-left text-xs text-zinc-200 hover:bg-emerald-950/40 hover:text-white transition-colors"
             >
               <div className="p-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                <Video className="h-3.5 w-3.5" />
+                <Mic className="h-3.5 w-3.5" />
               </div>
               <div>
-                <span className="font-semibold block text-emerald-300">🎥 Live CVI Call</span>
+                <span className="font-semibold block text-emerald-300">🎙️ Voice Studio</span>
                 <span className="text-[10px] text-zinc-400 block">
-                  Launch interactive video call with {personaId ? personaId.toUpperCase() : "presenter"}
+                  Calibrate voice synthesis for {personaId ? personaId.toUpperCase() : "presenter"}
                 </span>
               </div>
             </Link>

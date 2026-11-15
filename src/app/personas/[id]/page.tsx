@@ -595,53 +595,25 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
           <div className="pt-2 flex items-center gap-2 flex-wrap justify-center md:justify-start">
             <span className="text-[10px] font-mono uppercase font-bold text-muted mr-1">Studio Launch:</span>
             <Link
-              href={`/wardrobe-studio?personaId=${persona.slug}`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-semibold transition-all hover:scale-105"
-            >
-              <span>👗</span>
-              <span>Wardrobe</span>
-            </Link>
-            <Link
               href={`/voice-studio?personaId=${persona.slug}`}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition-all hover:scale-105"
             >
               <span>🎙️</span>
-              <span>Voice</span>
+              <span>Voice Studio</span>
             </Link>
             <Link
-              href={`/field-reporter-studio?personaId=${persona.slug}`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-all hover:scale-105"
+              href={`/ecommerce-studio?personaId=${persona.slug}`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold transition-all hover:scale-105"
             >
-              <span>🎥</span>
-              <span>Field Reporter</span>
+              <span>🛍️</span>
+              <span>E-Commerce Studio</span>
             </Link>
             <Link
-              href={`/roundtable-studio?anchor1=${persona.slug}`}
+              href="/newsroom"
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-semibold transition-all hover:scale-105"
             >
-              <span>🏛️</span>
-              <span>Roundtable</span>
-            </Link>
-            <Link
-              href={`/interview-studio?host=${persona.slug}`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold transition-all hover:scale-105"
-            >
-              <span>🎬</span>
-              <span>Interview</span>
-            </Link>
-            <Link
-              href={`/vtuber-studio?personaId=${persona.slug}`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition-all hover:scale-105"
-            >
-              <span>⚡</span>
-              <span>VTuber</span>
-            </Link>
-            <Link
-              href={`/tools/thumbnail-builder?personaId=${persona.slug}`}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all hover:scale-105"
-            >
-              <span>🖼️</span>
-              <span>Thumbnail</span>
+              <span>📡</span>
+              <span>Newsroom</span>
             </Link>
           </div>
         </div>

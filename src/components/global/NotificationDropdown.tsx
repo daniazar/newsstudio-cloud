@@ -236,19 +236,8 @@ export const NotificationDropdown = React.memo(function NotificationDropdown({
                     try {
                       const d = notification.data ? JSON.parse(notification.data) : null;
                       if (d?.jobId) {
-                        const isWardrobe = d?.storyId?.startsWith("wardrobe_") || notification.title?.toLowerCase().includes("wardrobe");
                         return (
                           <div className="flex items-center gap-2 mt-1">
-                            {isWardrobe && (
-                              <Link 
-                                href={`/wardrobe-studio?jobId=${d.jobId}`} 
-                                prefetch={false}
-                                onClick={() => setIsOpen(false)}
-                                className="text-[10px] text-purple-400 hover:underline font-semibold inline-flex items-center gap-1"
-                              >
-                                Wardrobe Studio <span>→</span>
-                              </Link>
-                            )}
                             <Link 
                               href={`/pipeline?jobId=${d.jobId}`} 
                               prefetch={false}
@@ -261,14 +250,15 @@ export const NotificationDropdown = React.memo(function NotificationDropdown({
                         );
                       }
                       if (d?.storyId) {
+                        const isWardrobeStory = typeof d.storyId === "string" && d.storyId.startsWith("wardrobe_");
                         return (
                           <Link 
-                            href={`/editor/${d.storyId}`} 
+                            href={isWardrobeStory ? "/pipeline" : `/editor/${d.storyId}`} 
                             prefetch={false}
                             onClick={() => setIsOpen(false)}
                             className="text-[10px] text-accent hover:underline mt-1 block font-semibold inline-flex items-center gap-1"
                           >
-                            Open Editor <span>→</span>
+                            {isWardrobeStory ? "Pipeline Queue" : "Open Editor"} <span>→</span>
                           </Link>
                         );
                       }
@@ -428,14 +418,15 @@ export const NotificationDropdown = React.memo(function NotificationDropdown({
                           );
                         }
                         if (d?.storyId) {
+                          const isWardrobeStory = typeof d.storyId === "string" && d.storyId.startsWith("wardrobe_");
                           return (
                             <Link 
-                              href={`/editor/${d.storyId}`} 
+                              href={isWardrobeStory ? "/pipeline" : `/editor/${d.storyId}`} 
                               prefetch={false}
                               onClick={() => setIsOpen(false)}
                               className="text-[10px] text-accent hover:underline mt-1 block font-semibold inline-flex items-center gap-1"
                             >
-                              Open Editor <span>→</span>
+                              {isWardrobeStory ? "Pipeline Queue" : "Open Editor"} <span>→</span>
                             </Link>
                           );
                         }

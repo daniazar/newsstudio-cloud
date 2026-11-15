@@ -11,7 +11,7 @@ import {
   Server, Cpu, Database, Terminal, Activity,
   ArrowRight, RefreshCw, Layers, CheckCircle2, XCircle,
   Play, Trash2, Zap, AlertTriangle, Wifi, WifiOff, HardDrive, LineChart,
-  Archive, ArrowUpRight
+  ArrowUpRight, ShoppingBag, Sliders, Users
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -90,34 +90,34 @@ interface DashboardData {
   }>;
 }
 
-const legacyRoutes = [
+const studioQuickLinks = [
   {
-    title: "Realtime Studio",
-    href: "/realtime",
-    badge: "WebRTC / Edge",
-    description: "Low-latency browser-native neural stage and WebRTC streaming testbed.",
-    icon: Zap,
+    title: "Newsroom Control Center",
+    href: "/newsroom",
+    badge: "Broadcast Ops",
+    description: "RSS ingestion, AI script synthesis, and live multi-anchor story orchestration.",
+    icon: Radio,
   },
   {
-    title: "WebGPU Lip-Sync Lab",
-    href: "/tools/musetalk-webgpu",
-    badge: "ONNX WebGPU",
-    description: "Client-side WebGPU accelerated lip-sync and audio-viseme extraction test harness.",
-    icon: Cpu,
+    title: "E-Commerce Studio",
+    href: "/ecommerce-studio",
+    badge: "Product Ads",
+    description: "Storefront product harvesting, AI ad scripting, and multi-aspect commercial rendering.",
+    icon: ShoppingBag,
   },
   {
-    title: "Motion & Gesture Studio",
-    href: "/motion-studio",
-    badge: "FSM Motion",
-    description: "FSM boundary-locked motion beats, gesture blending, and action loop matrix.",
-    icon: Activity,
+    title: "Voice Studio & Matrix",
+    href: "/voice-studio",
+    badge: "TTS & Voices",
+    description: "Multi-engine voice synthesis matrix, pronunciation testing, and presenter calibration.",
+    icon: Sliders,
   },
   {
-    title: "Talking Heads Lab",
-    href: "/talking-heads-lab",
-    badge: "Neural Arena",
-    description: "Multi-model talking head neural evaluation arena (AVTR-1, Ditto, MuseTalk, EchoMimic).",
-    icon: Tv,
+    title: "Persona Vault",
+    href: "/personas",
+    badge: "AI Presenters",
+    description: "Manage AI broadcast presenters, reference avatars, voice models, and visual presets.",
+    icon: Users,
   },
 ];
 
@@ -284,11 +284,11 @@ export default function AdminDashboardPage() {
 
         <div className="flex items-center gap-3">
           <a
-            href="#legacy-tools"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            href="#studio-launch"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
           >
-            <Archive className="w-3.5 h-3.5" />
-            <span>Legacy Labs (4)</span>
+            <Layers className="w-3.5 h-3.5" />
+            <span>Quick Studios ({studioQuickLinks.length})</span>
           </a>
           <button
             onClick={() => mutate()}
@@ -645,42 +645,42 @@ export default function AdminDashboardPage() {
         </>
       )}
 
-      {/* 8. Legacy Tools & Experimental Labs */}
-      <div id="legacy-tools" className="p-5 backdrop-blur-md bg-surface/30 border border-border/80 rounded-3xl shadow space-y-4">
+      {/* 8. Active Production Studios Quick-Launch */}
+      <div id="studio-launch" className="p-5 backdrop-blur-md bg-surface/30 border border-border/80 rounded-3xl shadow space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-3">
           <div>
             <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <Archive className="w-4 h-4 text-amber-400" /> Legacy Tools &amp; Experimental Labs
+              <Layers className="w-4 h-4 text-emerald-400" /> Active Production Studios
             </h3>
             <p className="text-[11px] text-muted font-medium mt-0.5">
-              Archived experimental studios and lab harnesses removed from main navigation but retained for developer testing and backwards compatibility.
+              Quick-launch operational Phase-1 studios and presenter workspaces directly from the administration console.
             </p>
           </div>
-          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 self-start sm:self-auto">
-            4 Archived Routes
+          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto">
+            {studioQuickLinks.length} Active Studios
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {legacyRoutes.map((item) => (
+          {studioQuickLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="group flex flex-col justify-between p-4 rounded-2xl bg-background/50 border border-border/40 hover:border-amber-500/40 hover:bg-amber-500/[0.03] transition-all duration-200"
+              className="group flex flex-col justify-between p-4 rounded-2xl bg-background/50 border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/[0.03] transition-all duration-200"
             >
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <div className="p-2 rounded-xl bg-white/[0.04] border border-border/60 group-hover:border-amber-500/30 group-hover:bg-amber-500/10 transition-colors">
-                    <item.icon className="w-4 h-4 text-amber-400" />
+                  <div className="p-2 rounded-xl bg-white/[0.04] border border-border/60 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 transition-colors">
+                    <item.icon className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 border border-border/60 text-muted group-hover:text-amber-300 group-hover:border-amber-500/30 transition-colors">
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 border border-border/60 text-muted group-hover:text-emerald-300 group-hover:border-emerald-500/30 transition-colors">
                     {item.badge}
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-foreground group-hover:text-amber-300 transition-colors flex items-center gap-1">
+                  <h4 className="text-xs font-bold text-foreground group-hover:text-emerald-300 transition-colors flex items-center gap-1">
                     <span>{item.title}</span>
-                    <ArrowUpRight className="w-3 h-3 opacity-0 -translate-x-1 translate-y-1 group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0 transition-all text-amber-400" />
+                    <ArrowUpRight className="w-3 h-3 opacity-0 -translate-x-1 translate-y-1 group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0 transition-all text-emerald-400" />
                   </h4>
                   <p className="text-[10px] text-muted font-medium leading-relaxed mt-1">
                     {item.description}
@@ -689,7 +689,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 pt-2.5 border-t border-border/30 flex items-center justify-between text-[10px] font-mono text-muted">
                 <span className="truncate max-w-[150px]">{item.href}</span>
-                <span className="text-amber-400/80 group-hover:text-amber-300 group-hover:underline font-bold">Open &rarr;</span>
+                <span className="text-emerald-400/80 group-hover:text-emerald-300 group-hover:underline font-bold">Open &rarr;</span>
               </div>
             </Link>
           ))}

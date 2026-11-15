@@ -327,26 +327,6 @@ const MetadataForm: React.FC<MetadataFormProps> = ({
               </button>
             </div>
           </div>
-
-          <hr className="border-border opacity-50" />
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-muted uppercase block">Video Thumbnail</label>
-            <div className="p-4 bg-surface rounded-lg border border-dashed border-border flex flex-col items-center gap-3 text-center">
-              <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-xl">🖼️</div>
-              <div className="space-y-1">
-                <p className="text-[11px] font-bold">AI High-Contrast Thumbnail</p>
-                <p className="text-[10px] text-muted leading-tight">Generate a click-worthy thumbnail based on your story&apos;s headline.</p>
-              </div>
-              <Link
-                href={`/tools/thumbnail-builder?storyId=${story.id}`}
-                className="w-full py-2 px-3 rounded-lg bg-accent text-accent-foreground text-xs font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
-              >
-                <span>🎨</span>
-                <span>Open Thumbnail Studio</span>
-              </Link>
-            </div>
-          </div>
         </div>
 
         {/* Instagram/TikTok */}

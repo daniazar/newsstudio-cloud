@@ -10,7 +10,6 @@ import {
   Plus,
   RefreshCw,
   Sliders,
-  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/components/global/ToastContainer";
 import { pingLocalWorkerWake } from "@/lib/hooks/useLocalWorkerWake";
@@ -377,11 +376,10 @@ function JobDrawer({ job, onClose }: { job: GenerationJob; onClose: () => void }
 
           <div className="pt-2">
             <Link 
-              href={job.type === "wardrobe_inpaint" ? `/wardrobe-studio?jobId=${job.id}` : `/editor/${job.storyId}`}
+              href={job.type === "wardrobe_inpaint" || !job.storyId ? "/vault" : `/editor/${job.storyId}`}
               className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-white/5 border border-border text-muted hover:text-foreground hover:bg-white/10 transition-colors"
             >
-              {job.type === "wardrobe_inpaint" && <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
-              <span>{job.type === "wardrobe_inpaint" ? "Open in Wardrobe Studio" : "Open Story in Editor"}</span>
+              <span>{job.type === "wardrobe_inpaint" || !job.storyId ? "Open Video Vault" : "Open Story in Editor"}</span>
             </Link>
           </div>
         </div>

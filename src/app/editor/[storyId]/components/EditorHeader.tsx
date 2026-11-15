@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { AspectRatio } from "@/lib/types";
@@ -150,15 +149,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             📝 SRT
           </a>
         )}
-
-        {/* Live CVI Call shortcut */}
-        <Link
-          href="/interactive-call"
-          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-emerald-500/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 flex items-center gap-1.5 transition-all shadow-sm"
-          title="Launch Real-Time Conversational Video Call Engine"
-        >
-          🎥 Live CVI Call
-        </Link>
 
         {/* Auto-Choreograph FSM Button */}
         <Button size="sm" variant="secondary" onClick={onOpenAutoChoreographer}>
