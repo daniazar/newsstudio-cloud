@@ -2,7 +2,7 @@
  * workers/pipeline-worker/index.ts
  *
  * Standalone Pipeline Worker: wakes instantly via Supabase Realtime Broadcast
- * or local HTTP loopback (:8765), executes local-first agy/Ollama LLM tasks
+ * or local HTTP loopback (:8766), executes local-first agy/Ollama LLM tasks
  * and GenerationJobs, manages GPU model servers, and runs headless Remotion renders.
  * Makes zero idle HTTP requests to MAIN_APP_URL while sleeping.
  */
@@ -48,6 +48,7 @@ import { prisma } from "@/lib/prisma";
 import { PRICING } from "@/lib/constants/pricing";
 import { sendOperationalAlert } from "@/lib/alerting/notifier";
 import { createLogger } from "@/lib/logger";
+import { generateAudioWithModernTts, type ModernTtsOptions } from "@/lib/tts/modernTtsClient";
 import {
   resolveSupabaseConfigFromEnv,
   startSupabaseRealtimeListener,
@@ -551,11 +552,124 @@ async function drainJobQueue(): Promise<void> {
   }
 }
 
-function startLocalWakeServer(): void {
+const MAX_WAKE_PREVIEW_BODY_BYTES = 1024 * 1024;
+
+async function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+
+    req.on("data", (chunk: Buffer) => {
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_WAKE_PREVIEW_BODY_BYTES) {
+        req.destroy();
+        reject(new Error("Request payload too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on("end", () => {
+      if (chunks.length === 0) {
+        resolve({});
+        return;
+      }
+      try {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const parsed = JSON.parse(raw);
+        resolve(parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {});
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+
+    req.on("error", (err) => reject(err));
+  });
+}
+
+async function handleLocalWakeTtsPreview(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<void> {
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody(req);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message === "Request payload too large" ? 413 : 400;
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: message }));
+    return;
+  }
+
+  const text =
+    typeof body.text === "string" && body.text.trim().length > 0
+      ? body.text
+      : "Welcome to Ruby News Studio. Testing voice synthesis calibration.";
+  const engine = typeof body.engine === "string" && body.engine ? body.engine : "piper";
+  const checkpoint =
+    typeof body.checkpoint === "string" && body.checkpoint
+      ? body.checkpoint
+      : "en_US-lessac-high";
+  const personaId = typeof body.personaId === "string" && body.personaId ? body.personaId : "ruby";
+  const referenceAudio =
+    typeof body.referenceAudio === "string" && body.referenceAudio
+      ? body.referenceAudio
+      : "Emily.wav";
+  const pitchShift = Number(body.pitchShift ?? 0.0);
+  const speedFactor = Number(body.speedFactor ?? 1.0);
+  const language = typeof body.language === "string" && body.language ? body.language : "auto";
+  const applyYeismo = body.applyYeismo !== undefined ? Boolean(body.applyYeismo) : true;
+
+  try {
+    if (modernTtsProcess === null) {
+      await startModernTtsServer();
+    }
+    clearModernTtsIdleTimeout();
+    resetModernTtsIdleTimeout();
+
+    const startedAt = performance.now();
+    const audioBuffer = await generateAudioWithModernTts(text, referenceAudio, {
+      engine: engine as ModernTtsOptions["engine"],
+      checkpoint,
+      personaId,
+      pitchShift: Number.isFinite(pitchShift) ? pitchShift : 0.0,
+      speedFactor: Number.isFinite(speedFactor) ? speedFactor : 1.0,
+      language,
+      applyYeismo,
+    });
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    resetModernTtsIdleTimeout();
+
+    res.writeHead(200, {
+      "Content-Type": "audio/wav",
+      "Content-Length": String(audioBuffer.length),
+      "X-Synthesis-Latency-Ms": String(elapsedMs),
+      "X-Synthesis-Engine": String(audioBuffer.usedEngine || engine),
+      "X-Synthesis-Model": String(audioBuffer.model || checkpoint),
+    });
+    res.end(audioBuffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    workerLog.warn({ err: message }, "Local wake /tts/preview failed");
+    if (!res.headersSent) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+    }
+    if (!res.writableEnded) {
+      res.end(JSON.stringify({ error: message }));
+    }
+  }
+}
+
+export function startLocalWakeServer(port = config.wakePort): http.Server {
   const server = http.createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Synthesis-Latency-Ms, X-Synthesis-Engine, X-Synthesis-Model"
+    );
     res.setHeader("Access-Control-Allow-Private-Network", "true");
 
     if (req.method === "OPTIONS") {
@@ -578,6 +692,10 @@ function startLocalWakeServer(): void {
       res.end(
         JSON.stringify({
           ok: true,
+          service: "newsstudio-worker",
+          running: true,
+          busy: isProcessing,
+          activeJobId: currentJobId,
           workerId: config.workerId,
           role: config.role,
           engine: config.engine,
@@ -589,23 +707,29 @@ function startLocalWakeServer(): void {
       return;
     }
 
+    if (reqPath === "/tts/preview" && req.method === "POST") {
+      void handleLocalWakeTtsPreview(req, res);
+      return;
+    }
+
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Not found" }));
   });
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      workerLog.warn(`Wake loopback port 127.0.0.1:${config.wakePort} already in use; relying on Supabase Realtime`);
+      workerLog.warn(`Wake loopback port 127.0.0.1:${port} already in use; relying on Supabase Realtime`);
     } else {
       workerLog.warn({ err: err.message }, "Local wake server error");
     }
   });
 
-  server.listen(config.wakePort, "127.0.0.1", () => {
-    workerLog.info(`🔔 Local HTTP wake server listening on http://127.0.0.1:${config.wakePort}`);
+  server.listen(port, "127.0.0.1", () => {
+    workerLog.info(`🔔 Local HTTP wake server listening on http://127.0.0.1:${port}`);
   });
 
   wakeServer = server;
+  return server;
 }
 
 async function heartbeat(): Promise<void> {
@@ -738,7 +862,7 @@ export async function main(): Promise<void> {
     });
     realtimeStop = listener.stop;
   } else {
-    workerLog.warn("⚠️  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset — Realtime wake disabled; relying on HTTP :8765 wake and safety sleep.");
+    workerLog.warn(`⚠️  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset — Realtime wake disabled; relying on HTTP :${config.wakePort} wake and safety sleep.`);
   }
 
   workerLog.info(

@@ -124,15 +124,12 @@ export const Sidebar = React.memo(function Sidebar() {
     isOverridden: pollingOverridden,
   } = usePolling();
 
-  // Poll system health only in local non-production mode (0 idle polling in prod)
-  const { data: health } = useSWR(
-    process.env.NODE_ENV === "production" ? null : "/api/health",
-    fetcher,
-    {
-      refreshInterval: 0,
-      revalidateOnFocus: false,
-    },
-  );
+  // Single-shot mount fetch for system health (0 idle polling)
+  const { data: health } = useSWR("/api/health", fetcher, {
+    refreshInterval: 0,
+    revalidateOnFocus: false,
+    revalidateIfStale: false,
+  });
 
   // Fetch notifications on mount / focus (no idle polling)
   const { data: notifications } = useSWR<
@@ -257,6 +254,18 @@ export const Sidebar = React.memo(function Sidebar() {
       );
     }
     return <span className="inline-flex rounded-full h-2 w-2 bg-slate-600" />;
+  };
+
+  const getStatusTextColor = (status?: string, highlightOffline = false) => {
+    if (status === "online") return "text-emerald-400";
+    if (status === "unconfigured") return "text-slate-400";
+    if (status === "offline" && highlightOffline) return "text-rose-400";
+    return "text-slate-500";
+  };
+
+  const getStatusLabel = (status?: string, fallbackLabel = "idle") => {
+    if (status === "unconfigured") return "local";
+    return status || fallbackLabel;
   };
 
   const getBadgeStyle = (variant?: string) => {
@@ -479,9 +488,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.database?.status === "online" ? "text-emerald-400" : "text-rose-400"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.database?.status, true)}`}
                 >
-                  {health?.services?.database?.status || "wait"}
+                  {getStatusLabel(health?.services?.database?.status, "wait")}
                 </span>
               </div>
 
@@ -494,9 +503,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.storage?.status === "online" ? "text-emerald-400" : "text-rose-400"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.storage?.status, true)}`}
                 >
-                  {health?.services?.storage?.status || "wait"}
+                  {getStatusLabel(health?.services?.storage?.status, "wait")}
                 </span>
               </div>
 
@@ -509,9 +518,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.tts?.status === "online" ? "text-emerald-400" : "text-rose-400"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.tts?.status, true)}`}
                 >
-                  {health?.services?.tts?.status || "wait"}
+                  {getStatusLabel(health?.services?.tts?.status, "wait")}
                 </span>
               </div>
 
@@ -524,9 +533,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.musetalk?.status === "online" ? "text-emerald-400" : "text-slate-500"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.musetalk?.status)}`}
                 >
-                  {health?.services?.musetalk?.status || "idle"}
+                  {getStatusLabel(health?.services?.musetalk?.status, "idle")}
                 </span>
               </div>
 
@@ -539,9 +548,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.comfyui?.status === "online" ? "text-emerald-400" : "text-slate-500"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.comfyui?.status)}`}
                 >
-                  {health?.services?.comfyui?.status || "idle"}
+                  {getStatusLabel(health?.services?.comfyui?.status, "idle")}
                 </span>
               </div>
 
@@ -554,9 +563,9 @@ export const Sidebar = React.memo(function Sidebar() {
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] font-mono font-bold uppercase ${health?.services?.object3d?.status === "online" ? "text-emerald-400" : "text-slate-500"}`}
+                  className={`text-[9px] font-mono font-bold uppercase ${getStatusTextColor(health?.services?.object3d?.status)}`}
                 >
-                  {health?.services?.object3d?.status || "idle"}
+                  {getStatusLabel(health?.services?.object3d?.status, "idle")}
                 </span>
               </div>
             </div>

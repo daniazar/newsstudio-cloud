@@ -67,6 +67,60 @@ async function measureLatency<T>(fn: () => Promise<T>): Promise<{ result: T; lat
   return { result, latency: Math.round(end - start) };
 }
 
+/**
+ * Returns true when running in cloud web mode (non-worker production or R2 storage)
+ * and the engine URL is unset or points to container-local loopback (localhost/127.0.0.1).
+ * Preserves existing test behavior when NODE_ENV === "test".
+ */
+export function isUnconfiguredLocalEngineInCloud(envUrl: string | undefined): boolean {
+  if (process.env.NODE_ENV === "test") return false;
+  const inCloudWebMode =
+    (process.env.NODE_ENV === "production" || process.env.STORAGE_PROVIDER === "r2") &&
+    process.env.IS_PIPELINE_WORKER !== "true";
+  if (!inCloudWebMode) return false;
+
+  const trimmed = envUrl?.trim();
+  if (!trimmed) return true;
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host === "[::1]" ||
+      host === "0.0.0.0"
+    );
+  } catch {
+    const lower = trimmed.toLowerCase();
+    return lower.includes("localhost") || lower.includes("127.0.0.1") || lower.includes("::1");
+  }
+}
+
+async function probeEngineHealth(
+  envUrl: string | undefined,
+  defaultUrl: string
+): Promise<ServiceStatus> {
+  if (isUnconfiguredLocalEngineInCloud(envUrl)) {
+    return { status: "unconfigured" };
+  }
+  const url = envUrl || defaultUrl;
+  try {
+    const { latency } = await measureLatency(async () => {
+      const res = await fetch(`${url}/health`, {
+        signal: AbortSignal.timeout(1500),
+      }).catch(async () => {
+        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
+      });
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+    });
+    return { status: "online", latencyMs: latency };
+  } catch (error) {
+    return { status: "offline", error: String(error) };
+  }
+}
+
 export async function checkDatabaseHealth(): Promise<ServiceStatus> {
   try {
     const { latency } = await measureLatency(async () => {
@@ -100,6 +154,9 @@ export async function checkOllamaHealth(): Promise<ServiceStatus> {
   if (process.env.LLM_PROVIDER && process.env.LLM_PROVIDER !== "ollama") {
     return { status: "unconfigured" };
   }
+  if (isUnconfiguredLocalEngineInCloud(process.env.OLLAMA_BASE_URL)) {
+    return { status: "unconfigured" };
+  }
   const url = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
   try {
     const { latency } = await measureLatency(async () => {
@@ -118,7 +175,11 @@ export async function checkTTSHealth(): Promise<ServiceStatus> {
   if (process.env.NEXT_PUBLIC_TTS_MODE && process.env.NEXT_PUBLIC_TTS_MODE !== "server") {
     return { status: "unconfigured" };
   }
-  const modernUrl = process.env.MODERN_TTS_SERVER_URL || process.env.NEXT_PUBLIC_MODERN_TTS_SERVER_URL || "http://localhost:8005";
+  const envUrl = process.env.MODERN_TTS_SERVER_URL || process.env.NEXT_PUBLIC_MODERN_TTS_SERVER_URL;
+  if (isUnconfiguredLocalEngineInCloud(envUrl)) {
+    return { status: "unconfigured" };
+  }
+  const modernUrl = envUrl || "http://localhost:8005";
 
   try {
     const { latency } = await measureLatency(async () => {
@@ -138,6 +199,9 @@ export async function checkTTSHealth(): Promise<ServiceStatus> {
 
 export async function checkComfyUIHealth(): Promise<ServiceStatus> {
   if (process.env.DISABLE_COMFYUI === "true") {
+    return { status: "unconfigured" };
+  }
+  if (isUnconfiguredLocalEngineInCloud(process.env.COMFYUI_URL)) {
     return { status: "unconfigured" };
   }
   const url = process.env.COMFYUI_URL || "http://localhost:8188";
@@ -160,7 +224,7 @@ export async function checkComfyUIHealth(): Promise<ServiceStatus> {
 }
 
 export async function checkSadTalkerHealth(): Promise<ServiceStatus> {
-  if (!process.env.SADTALKER_SERVER_URL) {
+  if (!process.env.SADTALKER_SERVER_URL || isUnconfiguredLocalEngineInCloud(process.env.SADTALKER_SERVER_URL)) {
     return { status: "unconfigured" };
   }
   const url = process.env.SADTALKER_SERVER_URL;
@@ -178,91 +242,32 @@ export async function checkSadTalkerHealth(): Promise<ServiceStatus> {
 }
 
 export async function checkMuseTalkHealth(): Promise<ServiceStatus> {
-  const url = process.env.TALKINGHEAD_SERVER_URL || process.env.MUSETALK_SERVER_URL || "http://localhost:8010";
-  try {
-    const { latency } = await measureLatency(async () => {
-      const res = await fetch(`${url}/health`, {
-        signal: AbortSignal.timeout(1500),
-      }).catch(async () => {
-        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
-      });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "online", latencyMs: latency };
-  } catch (error) {
-    return { status: "offline", error: String(error) };
-  }
+  return probeEngineHealth(
+    process.env.TALKINGHEAD_SERVER_URL || process.env.MUSETALK_SERVER_URL,
+    "http://localhost:8010"
+  );
 }
 
 export async function checkKeySyncHealth(): Promise<ServiceStatus> {
-  const url = process.env.KEYSYNC_SERVER_URL || "http://localhost:8008";
-  try {
-    const { latency } = await measureLatency(async () => {
-      const res = await fetch(`${url}/health`, {
-        signal: AbortSignal.timeout(1500),
-      }).catch(async () => {
-        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
-      });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "online", latencyMs: latency };
-  } catch (error) {
-    return { status: "offline", error: String(error) };
-  }
+  return probeEngineHealth(process.env.KEYSYNC_SERVER_URL, "http://localhost:8008");
 }
 
 export async function checkLivePortraitHealth(): Promise<ServiceStatus> {
-  const url = process.env.LIVEPORTRAIT_SERVER_URL || "http://localhost:8009";
-  try {
-    const { latency } = await measureLatency(async () => {
-      const res = await fetch(`${url}/health`, {
-        signal: AbortSignal.timeout(1500),
-      }).catch(async () => {
-        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
-      });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "online", latencyMs: latency };
-  } catch (error) {
-    return { status: "offline", error: String(error) };
-  }
+  return probeEngineHealth(process.env.LIVEPORTRAIT_SERVER_URL, "http://localhost:8009");
 }
 
 export async function checkModernMotionServerHealth(): Promise<ServiceStatus> {
-  const url = process.env.MODERN_MOTION_SERVER_URL || "http://localhost:8011";
-  try {
-    const { latency } = await measureLatency(async () => {
-      const res = await fetch(`${url}/health`, {
-        signal: AbortSignal.timeout(1500),
-      }).catch(async () => {
-        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
-      });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "online", latencyMs: latency };
-  } catch (error) {
-    return { status: "offline", error: String(error) };
-  }
+  return probeEngineHealth(process.env.MODERN_MOTION_SERVER_URL, "http://localhost:8011");
 }
 
 export async function checkModernTalkingHeadServerHealth(): Promise<ServiceStatus> {
-  const url = process.env.MODERN_TALKINGHEAD_SERVER_URL || "http://localhost:8010";
-  try {
-    const { latency } = await measureLatency(async () => {
-      const res = await fetch(`${url}/health`, {
-        signal: AbortSignal.timeout(1500),
-      }).catch(async () => {
-        return await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
-      });
-      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
-    });
-    return { status: "online", latencyMs: latency };
-  } catch (error) {
-    return { status: "offline", error: String(error) };
-  }
+  return probeEngineHealth(process.env.MODERN_TALKINGHEAD_SERVER_URL, "http://localhost:8010");
 }
 
 export async function checkObject3DServerHealth(): Promise<Object3DServiceStatus> {
+  if (isUnconfiguredLocalEngineInCloud(process.env.OBJECT3D_SERVER_URL)) {
+    return { status: "unconfigured" };
+  }
   const result = await checkObject3DHealth({ timeoutMs: 1500 });
   if (!result.online) {
     return { status: "offline", latencyMs: result.latencyMs, error: result.error };
