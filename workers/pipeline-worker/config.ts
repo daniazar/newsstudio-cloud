@@ -74,8 +74,8 @@ export const config = {
   /** Shared secret for authenticating with worker-facing API routes */
   apiKey: process.env.WORKER_API_KEY || "",
 
-  /** Local loopback HTTP wake server port */
-  wakePort: parseInt(process.env.WORKER_WAKE_PORT || "8765", 10),
+  /** Local loopback HTTP wake server port (8766 avoids collision with CineZero on 8765) */
+  wakePort: parseInt(process.env.WORKER_WAKE_PORT || "8766", 10) || 8766,
 
   /** 15m safety sweep against Supabase PostgREST when idle (0 Railway polls while idle) */
   dbSafetyPollMs: parseInt(process.env.WORKER_DB_POLL_MS || "900000", 10),

@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAudioWithModernTts, type ModernTtsOptions } from "@/lib/tts/modernTtsClient";
+import { requireTenant } from "@/lib/tenant";
+import { checkRateLimit, rateLimitResponse, RateLimitTiers } from "@/lib/security/rateLimit";
 
 export async function POST(req: NextRequest) {
+  const t = await requireTenant();
+  if (!t.ok) return t.response;
+  const { orgId } = t.tenant;
+
+  const rl = checkRateLimit(orgId, RateLimitTiers.AI_EXPENSIVE);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  const ttsUrl =
+    process.env.MODERN_TTS_SERVER_URL ||
+    process.env.NEXT_PUBLIC_MODERN_TTS_SERVER_URL ||
+    "http://localhost:8005";
+  const isLocalhost =
+    ttsUrl.includes("localhost") || ttsUrl.includes("127.0.0.1") || ttsUrl.includes("::1");
+  if (process.env.NODE_ENV === "production" && isLocalhost) {
+    return NextResponse.json(
+      {
+        error:
+          "Direct localhost Modern-TTS calls are disabled in production; routing preview to local worker.",
+        remoteWorkerRequired: true,
+      },
+      { status: 503 }
+    );
+  }
+
   const startTime = performance.now();
   try {
     const body = await req.json();

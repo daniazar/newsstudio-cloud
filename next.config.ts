@@ -42,6 +42,10 @@ const nextConfig: NextConfig = {
         source: "/studio_plates/:path*",
         destination: `${publicS3Url}/studio_plates/:path*`,
       },
+      {
+        source: "/studio_environments/:path*",
+        destination: `${publicS3Url}/studio_environments/:path*`,
+      },
     ];
   },
   // Cap static generation workers to 4 (prevents 23 workers from exhausting RAM and thrashing pagefile)
@@ -217,7 +221,7 @@ const nextConfig: NextConfig = {
         // it allows cross-origin resources without explicit CORS opt-in from the remote server.
         source: "/(.*)",
         headers: [
-          { key: "Cross-Origin-Opener-Policy",   value: "same-origin" },
+          { key: "Cross-Origin-Opener-Policy",   value: "same-origin-allow-popups" },
           { key: "Cross-Origin-Embedder-Policy",  value: "credentialless" },
           { key: "X-Content-Type-Options",       value: "nosniff" },
           { key: "X-Frame-Options",              value: "SAMEORIGIN" },
@@ -236,11 +240,11 @@ const nextConfig: NextConfig = {
               `img-src 'self' blob: data: https:${isProd ? "" : " http://localhost:* http://127.0.0.1:*"}`,
               "font-src 'self' https://fonts.gstatic.com data:",
               `media-src 'self' blob: data: https:${isProd ? "" : " http://localhost:* http://127.0.0.1:*"}`,
-              `connect-src 'self' blob: data: ws: wss: http://127.0.0.1:8765 https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://*.r2.cloudflarestorage.com https://*.clerk.accounts.dev https://api.clerk.com${isProd ? "" : " http:"}`,
+              `connect-src 'self' blob: data: ws: wss: http://127.0.0.1:8766 https://*.supabase.co wss://*.supabase.co https://*.r2.dev https://*.r2.cloudflarestorage.com https://*.clerk.accounts.dev https://api.clerk.com${isProd ? "" : " http:"}`,
               "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              "form-action 'self' https://*.clerk.accounts.dev https://accounts.google.com",
               "frame-ancestors 'self'",
             ].join("; "),
           },

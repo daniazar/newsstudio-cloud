@@ -21,6 +21,7 @@ import {
 import { PERSONAS } from "@/lib/tts/personas";
 import { getVoiceProfileByPersonaId } from "@/lib/tts/voiceCatalog";
 import { useToast } from "@/components/global/ToastContainer";
+import { LOCAL_WORKER_BASE_URL } from "@/lib/hooks/useLocalWorkerWake";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -285,8 +286,8 @@ function VoiceStudioContent() {
 
   // Service Health State
   const [serverHealth, setServerHealth] = useState<{
-    modernTts: "online" | "offline" | "checking";
-    ollama: "online" | "offline" | "checking";
+    modernTts: "online" | "offline" | "local" | "checking";
+    ollama: "online" | "offline" | "local" | "checking";
   }>({
     modernTts: "checking",
     ollama: "checking"
@@ -355,9 +356,11 @@ function VoiceStudioContent() {
       .then((res) => res.json())
       .then((data) => {
         if (mounted) {
+          const ttsStatus = data?.services?.tts?.status;
+          const ollamaStatus = data?.services?.ollama?.status;
           setServerHealth({
-            modernTts: data?.services?.modernTts ? "online" : "offline",
-            ollama: data?.services?.ollama ? "online" : "offline",
+            modernTts: ttsStatus === "online" ? "online" : ttsStatus === "unconfigured" ? "local" : "offline",
+            ollama: ollamaStatus === "online" ? "online" : ollamaStatus === "unconfigured" ? "local" : "offline",
           });
         }
       })
@@ -425,25 +428,50 @@ function VoiceStudioContent() {
     setLastLatencyMs(null);
 
     try {
-      const response = await fetch("/api/voice-settings/preview", {
+      const payload = {
+        text: testText,
+        engine,
+        checkpoint: selectedModel,
+        personaId: activePersonaId,
+        referenceAudio,
+        pitchShift,
+        speedFactor,
+        language: selectedLanguage === "auto" ? (activePersona.language || "es") : selectedLanguage,
+        applyYeismo
+      };
+
+      let response = await fetch("/api/voice-settings/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: testText,
-          engine,
-          checkpoint: selectedModel,
-          personaId: activePersonaId,
-          referenceAudio,
-          pitchShift,
-          speedFactor,
-          language: selectedLanguage === "auto" ? (activePersona.language || "es") : selectedLanguage,
-          applyYeismo
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Synthesis failed (${response.status})`);
+        if (response.status === 503 && errorData.remoteWorkerRequired) {
+          try {
+            response = await fetch(`${LOCAL_WORKER_BASE_URL}/tts/preview`, {
+              method: "POST",
+              mode: "cors",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+          } catch {
+            toast(
+              "Local Worker Unreachable",
+              `Voice preview requires the local PC worker at ${LOCAL_WORKER_BASE_URL}. Start it with: npm run worker`,
+              "error"
+            );
+            return;
+          }
+
+          if (!response.ok) {
+            const workerError = await response.json().catch(() => ({}));
+            throw new Error(workerError.error || `Local worker synthesis failed (${response.status})`);
+          }
+        } else {
+          throw new Error(errorData.error || `Synthesis failed (${response.status})`);
+        }
       }
 
       const latencyHeader = response.headers.get("X-Synthesis-Latency-Ms");

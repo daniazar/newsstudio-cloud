@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const LOCAL_WORKER_WAKE_URL = "http://127.0.0.1:8765/wake";
-const LOCAL_WORKER_STATUS_URL = "http://127.0.0.1:8765/status";
+const WORKER_WAKE_PORT =
+  process.env.NEXT_PUBLIC_WORKER_WAKE_PORT?.trim() || "8766";
+export const LOCAL_WORKER_BASE_URL = `http://127.0.0.1:${WORKER_WAKE_PORT}`;
+const LOCAL_WORKER_WAKE_URL = `${LOCAL_WORKER_BASE_URL}/wake`;
+const LOCAL_WORKER_STATUS_URL = `${LOCAL_WORKER_BASE_URL}/status`;
 
 export interface LocalWorkerStatus {
   reachable: boolean;
@@ -16,7 +19,7 @@ export interface LocalWorkerStatus {
 
 /**
  * Fire-and-forget ping to the developer/operator's local PC worker daemon
- * wake bridge (127.0.0.1:8765). Zero Railway requests; fails silently when
+ * wake bridge (127.0.0.1:8766). Zero Railway requests; fails silently when
  * the local worker bridge is not running on the user's machine.
  */
 export function pingLocalWorkerWake(reason?: string): void {
@@ -34,9 +37,9 @@ export function pingLocalWorkerWake(reason?: string): void {
 }
 
 /**
- * Reads http://127.0.0.1:8765/status locally (zero Railway requests) ONLY when
+ * Reads http://127.0.0.1:8766/status locally (zero Railway requests) ONLY when
  * `active` is true. Stops polling immediately when `active` becomes false or
- * the component unmounts.
+ * the component unmounts. Pass `intervalMs = 0` for a single-shot check.
  */
 export function useLocalWorkerStatus(
   active: boolean,
@@ -69,11 +72,27 @@ export function useLocalWorkerStatus(
       }
       const data = (await res.json()) as Record<string, unknown>;
       if (!mountedRef.current) return;
+      const isNewsStudioWorker =
+        data?.service === "newsstudio-worker" || typeof data?.role === "string";
+      if (!isNewsStudioWorker) {
+        setStatus({ reachable: false });
+        return;
+      }
       setStatus({
         reachable: true,
         running: typeof data.running === "boolean" ? data.running : true,
-        busy: typeof data.busy === "boolean" ? data.busy : undefined,
-        activeJobId: typeof data.activeJobId === "string" ? data.activeJobId : null,
+        busy:
+          typeof data.busy === "boolean"
+            ? data.busy
+            : typeof data.isProcessing === "boolean"
+              ? data.isProcessing
+              : undefined,
+        activeJobId:
+          typeof data.activeJobId === "string"
+            ? data.activeJobId
+            : typeof data.currentJobId === "string"
+              ? data.currentJobId
+              : null,
         lastWakeAt: typeof data.lastWakeAt === "string" ? data.lastWakeAt : null,
         raw: data,
       });
@@ -89,6 +108,7 @@ export function useLocalWorkerStatus(
   useEffect(() => {
     if (!active) return;
     void refresh();
+    if (intervalMs <= 0) return;
     const timer = setInterval(() => {
       void refresh();
     }, Math.max(2000, intervalMs));
