@@ -33,7 +33,7 @@ import { trackLlmUsage } from "@/lib/llm/tokenTracker";
 import { createLogger } from "@/lib/logger";
 import {
   broadcastWorkerWake,
-  enqueueLlmTask,
+  enqueueLlmTaskPersisted,
   runLocalLlm,
   type LlmBrokerResult,
 } from "@/lib/worker-broker";
@@ -915,7 +915,7 @@ async function tryLocalWorkerOrBrokerLlm(params: {
         model: params.model,
       });
     } else {
-      const handle = enqueueLlmTask({
+      const handle = await enqueueLlmTaskPersisted({
         prompt: promptText,
         systemPrompt: params.system,
         schema: params.schema,

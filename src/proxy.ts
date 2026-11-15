@@ -60,6 +60,8 @@ export const isPublicRoute = createPathMatcher([
   "/api/worker(.*)",
   "/api/ingest(.*)",
   "/api/ecommerce/turntable-3d(.*)/worker-update",
+  "/r2(.*)",
+  "/assets(.*)",
 ]);
 
 // Page routes that require an active organization (tenant) context
@@ -122,8 +124,8 @@ export { handler as proxy };
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, static files, and zero-auth health check probes
-    "/((?!_next|api/health|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Skip Next.js internals, static files, R2/assets rewrites, and zero-auth health check probes
+    "/((?!_next|api/health|r2/|assets/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm|mov|wav|mp3|ogg|m4a|glb)).*)",
     // Always run for other API routes
     "/(api(?!/health)|trpc)(.*)",
   ],

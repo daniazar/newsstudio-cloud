@@ -96,6 +96,10 @@ describe("Next.js 16 Proxy & Route Matching Suite", () => {
     expect(isOrgPageRoute({ nextUrl: { pathname: "/editor/123" } })).toBe(true);
     expect(isOrgPageRoute({ nextUrl: { pathname: "/ecommerce-studio" } })).toBe(true);
 
+    // Public asset proxy routes (/r2 and /assets)
+    expect(isPublicRoute({ nextUrl: { pathname: "/r2/avatars/ruby.png" } })).toBe(true);
+    expect(isPublicRoute({ nextUrl: { pathname: "/assets/ecommerce/demo.png" } })).toBe(true);
+
     // Protected admin API
     expect(isProtectedAdminApi({ nextUrl: { pathname: "/api/admin/users" } })).toBe(true);
     expect(isProtectedAdminApi({ nextUrl: { pathname: "/api/health" } })).toBe(false);

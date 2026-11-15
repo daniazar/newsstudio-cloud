@@ -22,9 +22,10 @@ export const AmbientClusterHUD = React.memo(function AmbientClusterHUD() {
   const { org: cachedOrg } = useCachedActiveOrg();
   const isProd = process.env.NODE_ENV === "production";
 
-  const { data: health } = useSWR(isProd ? null : "/api/health", fetcher, {
+  const { data: health } = useSWR("/api/health", fetcher, {
     refreshInterval: !isProd && pollingEnabled ? pollingInterval * 1000 : 0,
     revalidateOnFocus: false,
+    revalidateIfStale: false,
   });
 
   const { data: queueData } = useSWR(cachedOrg?.id ? "/api/pipeline/stats" : null, fetcher, {
@@ -81,29 +82,71 @@ export const AmbientClusterHUD = React.memo(function AmbientClusterHUD() {
 
         {/* Center: Realtime Engines */}
         <div className="hidden sm:flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <Radio className="w-3 h-3 text-emerald-400" />
-            <span className="text-subtle">TTS :8005</span>
-            <span className="text-[9px] text-emerald-400 font-bold">READY</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <Cpu className="w-3 h-3 text-sky-400" />
-            <span className="text-subtle">MuseTalk 40FPS</span>
-            <span className="text-[9px] text-sky-400 font-bold">READY</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-rose-400" />
-            <span className="text-subtle">Remotion 4K</span>
-            <span className="text-[9px] text-rose-400 font-bold">CUDA</span>
-          </div>
+          {(() => {
+            const h = health as unknown as
+              | {
+                  services?: {
+                    tts?: { status?: string };
+                    musetalk?: { status?: string };
+                    comfyui?: { status?: string };
+                  };
+                  workers?: Record<string, { onlineCount?: number } | undefined>;
+                }
+              | undefined;
+            const fullOnline = (h?.workers?.full?.onlineCount ?? 0) > 0;
+            const engines = [
+              {
+                key: "tts",
+                label: "TTS :8005",
+                Icon: Radio,
+                iconClass: "text-emerald-400",
+                serviceStatus: h?.services?.tts?.status,
+                workerOnline: (h?.workers?.audio?.onlineCount ?? 0) > 0 || fullOnline,
+              },
+              {
+                key: "musetalk",
+                label: "MuseTalk 40FPS",
+                Icon: Cpu,
+                iconClass: "text-sky-400",
+                serviceStatus: h?.services?.musetalk?.status,
+                workerOnline:
+                  (h?.workers?.video_full?.onlineCount ?? 0) > 0 ||
+                  (h?.workers?.video_bubble?.onlineCount ?? 0) > 0 ||
+                  fullOnline,
+              },
+              {
+                key: "remotion",
+                label: "Remotion 4K",
+                Icon: Sparkles,
+                iconClass: "text-rose-400",
+                serviceStatus: !isProd ? "online" : h?.services?.comfyui?.status,
+                workerOnline: (h?.workers?.render?.onlineCount ?? 0) > 0 || fullOnline,
+              },
+            ];
+            return engines.map(({ key, label, Icon, iconClass, serviceStatus, workerOnline }) => {
+              const badge =
+                serviceStatus === "online"
+                  ? { text: "READY", color: "text-emerald-400" }
+                  : workerOnline
+                    ? { text: "WORKER", color: "text-sky-400" }
+                    : !h || serviceStatus === "unconfigured"
+                      ? { text: "LOCAL", color: "text-amber-400" }
+                      : { text: "OFFLINE", color: "text-rose-400" };
+              return (
+                <div key={key} className="flex items-center gap-1.5">
+                  <Icon className={`w-3 h-3 ${iconClass}`} />
+                  <span className="text-subtle">{label}</span>
+                  <span className={`text-[9px] font-bold ${badge.color}`}>{badge.text}</span>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Right: Quick shortcut helper */}
         <div className="flex items-center gap-3">
           <Link
-            href="/newsroom"
+            href="/admin/telemetry"
             prefetch={false}
             className="flex items-center gap-1 text-muted hover:text-subtle transition-colors"
           >

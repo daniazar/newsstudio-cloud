@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireWorkerKey } from "@/lib/workerAuth";
-import { claimNextLlmTask } from "@/lib/worker-broker";
+import { claimNextLlmTaskPersisted } from "@/lib/worker-broker";
 
 async function handleClaim(req: Request): Promise<Response> {
   const authError = requireWorkerKey(req);
@@ -26,7 +26,7 @@ async function handleClaim(req: Request): Promise<Response> {
     }
   }
 
-  const task = claimNextLlmTask(workerId);
+  const task = await claimNextLlmTaskPersisted(workerId);
   return NextResponse.json({ task });
 }
 

@@ -1,7 +1,12 @@
 import { config } from "./config";
 import { pooledFetch } from "@/lib/network/httpPool";
 import { ECOMMERCE_MEDIA_JOB_TYPES } from "./tasks/ecommerceMediaTask";
-import type { LlmBrokerClaimedTask, LlmBrokerCompletePayload } from "@/lib/worker-broker";
+import type {
+  LlmBrokerClaimedTask,
+  LlmBrokerCompletePayload,
+  TtsPreviewBrokerClaimedTask,
+  TtsPreviewBrokerCompletePayload,
+} from "@/lib/worker-broker";
 
 /**
  * HTTP client for calling the main Next.js app's pipeline API.
@@ -343,4 +348,34 @@ export async function triggerScheduledRun(scheduleId: string): Promise<boolean> 
     `/api/admin/schedules/${encodeURIComponent(scheduleId)}`
   );
   return res.ok && Boolean(res.data?.success);
+}
+
+// ─── Cloud-to-Worker TTS Preview Broker Client ────────────────────────────
+
+/** Claim the oldest pending TTS voice preview task from the cloud broker */
+export async function claimTtsPreviewTask(
+  workerId: string
+): Promise<TtsPreviewBrokerClaimedTask | null> {
+  const res = await request<{ task?: TtsPreviewBrokerClaimedTask | null }>(
+    "POST",
+    `/api/pipeline/tts-preview/claim`,
+    { workerId }
+  );
+  if (!res.ok) {
+    return null;
+  }
+  return res.data?.task ?? null;
+}
+
+/** Post the completed (or failed) base64 WAV audio back to the cloud broker */
+export async function completeTtsPreviewTask(
+  taskId: string,
+  payload: TtsPreviewBrokerCompletePayload
+): Promise<boolean> {
+  const res = await request<{ completed?: boolean }>(
+    "POST",
+    `/api/pipeline/tts-preview/${encodeURIComponent(taskId)}/complete`,
+    payload
+  );
+  return res.ok && Boolean(res.data?.completed);
 }

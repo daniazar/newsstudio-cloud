@@ -17,15 +17,15 @@ import { RobustImg } from "../components/RobustImg";
 
 import type { AspectRatio } from "../../lib/types";
 
-export const SLOGANS = [
-  { id: "ruby-tech", text: "Welcome to Ruby Tech News", icon: "💎", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-  { id: "daily-brief", text: "Your Daily Tech Briefing", icon: "⚡", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-  { id: "future-now", text: "The Future, Right Now", icon: "🚀", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
-  { id: "dev-pulse", text: "Pulse of the Dev World", icon: "💻", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" },
-  { id: "curiosity-gap", text: "Lo que nadie te contó hoy", icon: "💡", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-  { id: "emergency-alert", text: "¡Alerta máxima de último momento!", icon: "🚨", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-  { id: "data-shock", text: "Un número que cambió todo hoy", icon: "📊", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
-  { id: "breaking-rioplatense", text: "Información exclusiva en vivo", icon: "🔥", audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" },
+export const SLOGANS: ReadonlyArray<{ id: string; text: string; icon: string; audio?: string }> = [
+  { id: "ruby-tech", text: "Welcome to Ruby Tech News", icon: "💎" },
+  { id: "daily-brief", text: "Your Daily Tech Briefing", icon: "⚡" },
+  { id: "future-now", text: "The Future, Right Now", icon: "🚀" },
+  { id: "dev-pulse", text: "Pulse of the Dev World", icon: "💻" },
+  { id: "curiosity-gap", text: "Lo que nadie te contó hoy", icon: "💡" },
+  { id: "emergency-alert", text: "¡Alerta máxima de último momento!", icon: "🚨" },
+  { id: "data-shock", text: "Un número que cambió todo hoy", icon: "📊" },
+  { id: "breaking-rioplatense", text: "Información exclusiva en vivo", icon: "🔥" },
 ];
 
 interface IntroLayerProps {

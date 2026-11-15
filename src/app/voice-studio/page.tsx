@@ -446,9 +446,22 @@ function VoiceStudioContent() {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!response.ok || contentType.includes("application/json")) {
         const errorData = await response.json().catch(() => ({}));
-        if (response.status === 503 && errorData.remoteWorkerRequired) {
+        if (errorData.remoteWorkerRequired || response.status === 503) {
+          const isHttpOrigin =
+            typeof window !== "undefined" && window.location.protocol === "http:";
+          if (!isHttpOrigin) {
+            toast(
+              "Local Worker Unreachable",
+              errorData.error ||
+                "Start your local PC worker (npm run worker) to synthesize previews from the cloud.",
+              "error"
+            );
+            return;
+          }
+
           try {
             response = await fetch(`${LOCAL_WORKER_BASE_URL}/tts/preview`, {
               method: "POST",

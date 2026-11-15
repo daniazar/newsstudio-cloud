@@ -30,10 +30,18 @@ const nextConfig: NextConfig = {
           { protocol: "http", hostname: "127.0.0.1" },
         ],
   },
-  // Rewrite static avatar & studio plate requests directly to Cloudflare R2 when NEXT_PUBLIC_S3_PUBLIC_URL is configured
+  // Rewrite static media & R2 asset requests directly to Cloudflare R2 when NEXT_PUBLIC_S3_PUBLIC_URL is configured
   async rewrites() {
     if (!publicS3Url) return [];
     return [
+      {
+        source: "/r2/:path*",
+        destination: `${publicS3Url}/:path*`,
+      },
+      {
+        source: "/assets/:path*",
+        destination: `${publicS3Url}/assets/:path*`,
+      },
       {
         source: "/avatars/:path*",
         destination: `${publicS3Url}/avatars/:path*`,
@@ -206,8 +214,41 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Immutable caching for media assets (action loops, audio, avatars, icons, textures)
+        // Immutable caching and permissive CORS for media assets (action loops, audio, avatars, icons, textures)
         source: "/assets/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
+      {
+        // Same-origin R2 proxy & rewritten static directories with CORS/CORP for Remotion WebAudio & Canvas
+        source: "/r2/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
+      {
+        source: "/avatars/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
+      {
+        source: "/studio_plates/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
+      {
+        source: "/studio_environments/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
           { key: "Access-Control-Allow-Origin", value: "*" },

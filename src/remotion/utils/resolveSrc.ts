@@ -8,6 +8,13 @@ import { staticFile } from "remotion";
  */
 export const resolveSrc = (src?: string | null): string => {
   if (!src) return "";
+  const publicBase = (process.env.NEXT_PUBLIC_S3_PUBLIC_URL || "").replace(/\/+$/, "");
+  const isHttpsBrowser = typeof window !== "undefined" && window.location.protocol === "https:";
+
+  if (isHttpsBrowser && publicBase && src.startsWith(`${publicBase}/`)) {
+    return `/r2/${src.slice(publicBase.length + 1)}`;
+  }
+
   if (
     src.startsWith("http://") ||
     src.startsWith("https://") ||
@@ -17,6 +24,12 @@ export const resolveSrc = (src?: string | null): string => {
     return src;
   }
   if (src.startsWith("tenants/")) {
+    if (isHttpsBrowser && publicBase) {
+      return `/r2/${src}`;
+    }
+    if (publicBase) {
+      return `${publicBase}/${src}`;
+    }
     const endpoint =
       typeof window !== "undefined"
         ? process.env.NEXT_PUBLIC_S3_ENDPOINT || `http://${window.location.hostname}:9000`

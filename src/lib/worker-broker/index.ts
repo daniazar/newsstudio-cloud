@@ -28,6 +28,9 @@ export {
   enqueueAndWaitLlmTask,
   claimNextLlmTask,
   completeLlmTask,
+  enqueueLlmTaskPersisted,
+  claimNextLlmTaskPersisted,
+  completeLlmTaskPersisted,
   getLlmBrokerStats,
   resetLlmBrokerForTests,
   type LlmBrokerEnqueueInput,
@@ -35,3 +38,18 @@ export {
   type LlmBrokerCompletePayload,
   type LlmBrokerResult,
 } from "./llmBroker";
+
+export {
+  TtsPreviewBrokerTimeoutError,
+  enqueueTtsPreviewTask,
+  claimNextTtsPreviewTask,
+  completeTtsPreviewTask,
+  enqueueTtsPreviewTaskPersisted,
+  claimNextTtsPreviewTaskPersisted,
+  completeTtsPreviewTaskPersisted,
+  resetTtsPreviewBrokerForTests,
+  type TtsPreviewBrokerEnqueueInput,
+  type TtsPreviewBrokerClaimedTask,
+  type TtsPreviewBrokerCompletePayload,
+  type TtsPreviewBrokerResult,
+} from "./ttsPreviewBroker";

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireWorkerKey } from "@/lib/workerAuth";
-import { completeLlmTask, type LlmBrokerCompletePayload } from "@/lib/worker-broker";
+import { completeLlmTaskPersisted, type LlmBrokerCompletePayload } from "@/lib/worker-broker";
 
 export async function POST(
   req: Request,
@@ -28,7 +28,7 @@ export async function POST(
     );
   }
 
-  const completed = completeLlmTask(taskId, {
+  const completed = await completeLlmTaskPersisted(taskId, {
     status: body.status,
     text: typeof body.text === "string" ? body.text : undefined,
     error: typeof body.error === "string" ? body.error : undefined,

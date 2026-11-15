@@ -12,6 +12,8 @@ if (!process.env.AGY_MODEL) process.env.AGY_MODEL = "gemini-3.8-flash-low";
 if (!process.env.AGY_EFFORT) process.env.AGY_EFFORT = "low";
 
 import http from "http";
+import { DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { BUCKET_NAME, s3Client } from "@/lib/storage/s3Client";
 import { config, validateConfig } from "./config";
 import {
   pollQueue,
@@ -21,6 +23,8 @@ import {
   triggerAutoPublish,
   claimLlmTask,
   completeLlmTask,
+  claimTtsPreviewTask,
+  completeTtsPreviewTask,
   triggerScheduledRun,
 } from "./api";
 import type { QueuedJob } from "./api";
@@ -75,7 +79,12 @@ let sleepCancel: (() => void) | null = null;
 let pendingWakeReason: string | null = null;
 let isDrainingLlm = false;
 let pendingLlmDrain = false;
+let isDrainingTtsPreview = false;
+let pendingTtsPreviewDrain = false;
+let lastTempSweepAt = 0;
 const workerStartedAt = Date.now();
+const TEMP_SWEEP_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const TEMP_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 let modernTtsIdleTimeout: ReturnType<typeof setTimeout> | null = null;
 let modernTalkingHeadIdleTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -471,9 +480,160 @@ function interruptibleSleep(ms: number): Promise<"woken" | "timeout"> {
 
 function wakeWorker(reason: string): void {
   pendingWakeReason = reason;
-  void drainLlmTasks();
+  void heartbeat();
+  if (reason === "tts_preview") {
+    void drainTtsPreviewTasks();
+  } else {
+    void drainTtsPreviewTasks();
+    void drainLlmTasks();
+  }
   if (sleepCancel) {
     sleepCancel();
+  }
+}
+
+async function synthesizePreviewWav(params: {
+  text: string;
+  engine: string;
+  checkpoint: string;
+  personaId: string;
+  referenceAudio: string;
+  pitchShift: number;
+  speedFactor: number;
+  language: string;
+  applyYeismo: boolean;
+}): Promise<{
+  audioBuffer: Buffer;
+  latencyMs: number;
+  usedEngine: string;
+  model: string;
+}> {
+  if (modernTtsProcess === null) {
+    await startModernTtsServer();
+  }
+  clearModernTtsIdleTimeout();
+  resetModernTtsIdleTimeout();
+
+  const startedAt = performance.now();
+  const audioBuffer = await generateAudioWithModernTts(params.text, params.referenceAudio, {
+    engine: params.engine as ModernTtsOptions["engine"],
+    checkpoint: params.checkpoint,
+    personaId: params.personaId,
+    pitchShift: Number.isFinite(params.pitchShift) ? params.pitchShift : 0.0,
+    speedFactor: Number.isFinite(params.speedFactor) ? params.speedFactor : 1.0,
+    language: params.language,
+    applyYeismo: params.applyYeismo,
+  });
+  const latencyMs = Math.round(performance.now() - startedAt);
+  resetModernTtsIdleTimeout();
+
+  return {
+    audioBuffer,
+    latencyMs,
+    usedEngine: String(audioBuffer.usedEngine || params.engine),
+    model: String(audioBuffer.model || params.checkpoint),
+  };
+}
+
+async function drainTtsPreviewTasks(): Promise<void> {
+  if (isShuttingDown) return;
+  if (isDrainingTtsPreview) {
+    pendingTtsPreviewDrain = true;
+    return;
+  }
+  isDrainingTtsPreview = true;
+  try {
+    do {
+      pendingTtsPreviewDrain = false;
+      while (!isShuttingDown) {
+        const task = await claimTtsPreviewTask(config.workerId);
+        if (!task) break;
+        try {
+          const synth = await synthesizePreviewWav({
+            text: task.text,
+            engine: task.engine,
+            checkpoint: task.checkpoint,
+            personaId: task.personaId,
+            referenceAudio: task.referenceAudio,
+            pitchShift: task.pitchShift,
+            speedFactor: task.speedFactor,
+            language: task.language,
+            applyYeismo: task.applyYeismo,
+          });
+          await completeTtsPreviewTask(task.taskId, {
+            status: "done",
+            audioBase64: synth.audioBuffer.toString("base64"),
+            latencyMs: synth.latencyMs,
+            engine: synth.usedEngine,
+            model: synth.model,
+          });
+          workerLog.info(
+            { taskId: task.taskId, engine: synth.usedEngine, latencyMs: synth.latencyMs },
+            "Completed cloud-relayed TTS preview task"
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await completeTtsPreviewTask(task.taskId, {
+            status: "failed",
+            error: errMsg,
+          }).catch(() => {});
+          workerLog.warn({ taskId: task.taskId, err: errMsg }, "Cloud-relayed TTS preview task failed");
+        }
+      }
+    } while (pendingTtsPreviewDrain && !isShuttingDown);
+  } catch (err) {
+    workerLog.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Error draining TTS preview tasks"
+    );
+  } finally {
+    isDrainingTtsPreview = false;
+  }
+}
+
+async function sweepExpiredTempStorage(): Promise<void> {
+  if (process.env.STORAGE_PROVIDER !== "r2") return;
+  if (Date.now() - lastTempSweepAt < TEMP_SWEEP_INTERVAL_MS) return;
+  lastTempSweepAt = Date.now();
+
+  const rawPrefix = (process.env.S3_KEY_PREFIX || "").trim().replace(/^\/+|\/+$/g, "");
+  const tempPrefix = rawPrefix ? `${rawPrefix}/temp/` : "temp/";
+  const cutoffMs = Date.now() - TEMP_MAX_AGE_MS;
+
+  try {
+    let continuationToken: string | undefined;
+    let deletedCount = 0;
+
+    do {
+      const listed = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: BUCKET_NAME,
+          Prefix: tempPrefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+      for (const obj of listed.Contents || []) {
+        if (obj.Key && obj.LastModified && obj.LastModified.getTime() < cutoffMs) {
+          await s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: obj.Key,
+            })
+          );
+          deletedCount += 1;
+        }
+      }
+      continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+    } while (continuationToken && !isShuttingDown);
+
+    if (deletedCount > 0) {
+      workerLog.info({ deletedCount, tempPrefix }, "Swept expired temporary R2 objects");
+    }
+  } catch (err) {
+    workerLog.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Temporary R2 sweep skipped due to error"
+    );
   }
 }
 
@@ -622,33 +782,26 @@ async function handleLocalWakeTtsPreview(
   const applyYeismo = body.applyYeismo !== undefined ? Boolean(body.applyYeismo) : true;
 
   try {
-    if (modernTtsProcess === null) {
-      await startModernTtsServer();
-    }
-    clearModernTtsIdleTimeout();
-    resetModernTtsIdleTimeout();
-
-    const startedAt = performance.now();
-    const audioBuffer = await generateAudioWithModernTts(text, referenceAudio, {
-      engine: engine as ModernTtsOptions["engine"],
+    const synth = await synthesizePreviewWav({
+      text,
+      engine,
       checkpoint,
       personaId,
+      referenceAudio,
       pitchShift: Number.isFinite(pitchShift) ? pitchShift : 0.0,
       speedFactor: Number.isFinite(speedFactor) ? speedFactor : 1.0,
       language,
       applyYeismo,
     });
-    const elapsedMs = Math.round(performance.now() - startedAt);
-    resetModernTtsIdleTimeout();
 
     res.writeHead(200, {
       "Content-Type": "audio/wav",
-      "Content-Length": String(audioBuffer.length),
-      "X-Synthesis-Latency-Ms": String(elapsedMs),
-      "X-Synthesis-Engine": String(audioBuffer.usedEngine || engine),
-      "X-Synthesis-Model": String(audioBuffer.model || checkpoint),
+      "Content-Length": String(synth.audioBuffer.length),
+      "X-Synthesis-Latency-Ms": String(synth.latencyMs),
+      "X-Synthesis-Engine": synth.usedEngine,
+      "X-Synthesis-Model": synth.model,
     });
-    res.end(audioBuffer);
+    res.end(synth.audioBuffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     workerLog.warn({ err: message }, "Local wake /tts/preview failed");
@@ -853,6 +1006,7 @@ export async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
 
   startLocalWakeServer();
+  void heartbeat();
 
   const supaCfg = resolveSupabaseConfigFromEnv();
   if (supaCfg) {
@@ -879,6 +1033,7 @@ export async function main(): Promise<void> {
   // Initial startup drain (only hits Railway if Supabase reports queued work or Supabase env is unset)
   const shouldDrainOnBoot = !supaCfg || (await checkSupabaseQueuedJobs(supaCfg));
   if (shouldDrainOnBoot) {
+    await drainTtsPreviewTasks();
     await drainLlmTasks();
     await drainJobQueue();
   }
@@ -889,10 +1044,13 @@ export async function main(): Promise<void> {
 
     if (wakeOutcome === "woken") {
       pendingWakeReason = null;
+      await drainTtsPreviewTasks();
       await drainLlmTasks();
       await drainJobQueue();
       continue;
     }
+
+    await sweepExpiredTempStorage();
 
     // 15m safety sweep: query Supabase PostgREST directly (<300 bytes) with 0 Railway traffic when idle
     if (supaCfg) {
@@ -902,10 +1060,12 @@ export async function main(): Promise<void> {
       }
       const hasJobs = await checkSupabaseQueuedJobs(supaCfg);
       if (hasJobs || dueSchedules.length > 0) {
+        await drainTtsPreviewTasks();
         await drainLlmTasks();
         await drainJobQueue();
       }
     } else {
+      await drainTtsPreviewTasks();
       await drainLlmTasks();
       await drainJobQueue();
     }

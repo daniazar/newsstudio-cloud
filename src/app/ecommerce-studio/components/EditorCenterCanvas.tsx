@@ -45,6 +45,7 @@ export const EditorCenterCanvas: React.FC<EditorCenterCanvasProps> = ({
             compositionHeight={selectedConfig.height}
             fps={30}
             controls
+            acknowledgeRemotionLicense
             style={{ width: "100%", height: "100%" }}
           />
         ) : (

@@ -60,9 +60,10 @@ describe("POST /api/voice-settings/preview", () => {
     expect(res.status).toBe(429);
   });
 
-  it("returns 503 with remoteWorkerRequired in production when Modern-TTS is unset or localhost", async () => {
+  it("returns 200 with remoteWorkerRequired in production when Modern-TTS is unset or localhost and no worker claims", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("MODERN_TTS_SERVER_URL", "http://localhost:8005");
+    vi.stubEnv("TTS_PREVIEW_CLAIM_TIMEOUT_MS", "30");
     const ttsSpy = vi.spyOn(modernTtsClient, "generateAudioWithModernTts");
 
     const req = new NextRequest("https://newsstudio.up.railway.app/api/voice-settings/preview", {
@@ -73,8 +74,47 @@ describe("POST /api/voice-settings/preview", () => {
     const res = await POST(req);
     const data = await res.json();
 
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(false);
     expect(data.remoteWorkerRequired).toBe(true);
+    expect(ttsSpy).not.toHaveBeenCalled();
+  });
+
+  it("relays audio/wav through the local worker broker in production when Modern-TTS is localhost", async () => {
+    const {
+      claimNextTtsPreviewTask,
+      completeTtsPreviewTask,
+      resetTtsPreviewBrokerForTests,
+    } = await import("@/lib/worker-broker/ttsPreviewBroker");
+    resetTtsPreviewBrokerForTests();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("MODERN_TTS_SERVER_URL", "http://localhost:8005");
+    vi.stubEnv("TTS_PREVIEW_CLAIM_TIMEOUT_MS", "500");
+    const ttsSpy = vi.spyOn(modernTtsClient, "generateAudioWithModernTts");
+
+    const req = new NextRequest("https://newsstudio.up.railway.app/api/voice-settings/preview", {
+      method: "POST",
+      body: JSON.stringify({ text: "Cloud relayed TTS preview", engine: "piper", checkpoint: "ruby-es" }),
+    });
+
+    const responsePromise = POST(req);
+    await new Promise((r) => setTimeout(r, 15));
+    const claimed = claimNextTtsPreviewTask();
+    expect(claimed?.text).toBe("Cloud relayed TTS preview");
+    completeTtsPreviewTask(claimed!.taskId, {
+      status: "done",
+      audioBase64: Buffer.from("RIFF_RELAYED_WAV").toString("base64"),
+      latencyMs: 42,
+      engine: "piper",
+      model: "ruby-es",
+    });
+
+    const res = await responsePromise;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("audio/wav");
+    expect(res.headers.get("X-Synthesis-Engine")).toBe("piper");
+    expect(bytes.toString()).toBe("RIFF_RELAYED_WAV");
     expect(ttsSpy).not.toHaveBeenCalled();
   });
 
