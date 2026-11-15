@@ -31,7 +31,8 @@ export default function BrandDetailPage({ params }: { params: Promise<{ id: stri
 
   // SWR queries
   const { data: brand, mutate } = useSWR<BrandDetails>(id ? `/api/brands/${id}` : null, fetcher);
-  const { data: globalRssGroups } = useSWR<BrandRssGroup[]>("/api/rss-groups", fetcher);
+  const { data: globalRssGroupsRaw } = useSWR<{ groups?: BrandRssGroup[]; data?: BrandRssGroup[] } | BrandRssGroup[]>("/api/feeds/groups", fetcher);
+  const globalRssGroups: BrandRssGroup[] = Array.isArray(globalRssGroupsRaw) ? globalRssGroupsRaw : (globalRssGroupsRaw?.groups ?? globalRssGroupsRaw?.data ?? []);
   const { data: globalPersonasRaw } = useSWR<{ data?: BrandPersona[]; personas?: BrandPersona[] } | BrandPersona[]>("/api/personas?limit=500&lite=true", fetcher);
   const globalPersonas: BrandPersona[] = Array.isArray(globalPersonasRaw) ? globalPersonasRaw : (globalPersonasRaw?.data ?? globalPersonasRaw?.personas ?? []);
   const { data: globalRssFeedsRaw } = useSWR<{ data?: BrandRssFeed[]; feeds?: BrandRssFeed[] } | BrandRssFeed[]>("/api/feeds?limit=500&lite=true", fetcher);
