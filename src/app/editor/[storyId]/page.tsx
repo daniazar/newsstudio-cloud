@@ -511,17 +511,28 @@ export default function EditorPage() {
 
       toast("B-Roll Generating", `Searching stock video & generating AI visual for Scene ${index + 1}...`, "info");
       try {
-        const res = await fetch(`/api/stories/${storyId}/broll`, {
+        const res = await fetch(`/api/stories/${storyId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ segmentIndex: index, prompt: targetSeg.imagePrompt }),
+          body: JSON.stringify({
+            action: "auto-match-broll",
+            segmentIndex: targetSeg.index,
+            query: targetSeg.keyword || targetSeg.imagePrompt,
+            mediaType: "video",
+          }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.assetPath) {
-            await handleUpdateAsset(index, data.assetPath, data.assetType || "video");
+          const newAssetPath = data.segment?.assetPath || data.asset?.url || data.assetPath;
+          const newAssetType = data.segment?.assetType || data.asset?.type || data.assetType || "video";
+          if (newAssetPath) {
+            await handleUpdateAsset(index, newAssetPath, newAssetType);
             toast("B-Roll Updated", `New B-roll assigned to Scene ${index + 1}!`, "success");
+          } else {
+            toast("No B-Roll Found", data.message || "No matching stock assets found.", "info");
           }
+        } else {
+          toast("B-Roll Failed", "Could not generate B-Roll.", "error");
         }
       } catch {
         toast("B-Roll Failed", "Could not generate B-Roll.", "error");
@@ -1288,11 +1299,18 @@ export default function EditorPage() {
     setIsPolishingScript(true);
     toast("AI Script Polish", "Polishing script for broadcast cadence & tone...", "info");
     try {
-      const res = await fetch(`/api/stories/${storyId}/polish-script`, { method: "POST" });
+      const res = await fetch(`/api/stories/${storyId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "polish-script" }),
+      });
       if (res.ok) {
         const refreshed = await fetch(`/api/stories/${storyId}`).then((r) => r.json());
         setStory(refreshed);
         toast("Script Polished", "Broadcast cadence and spoken phrasing optimized!", "success");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("Polish Failed", err.error || "Could not polish script.", "error");
       }
     } catch {
       toast("Polish Failed", "Could not polish script.", "error");
@@ -1306,38 +1324,52 @@ export default function EditorPage() {
     toast("Auto-Producing Episode", "Generating missing TTS, B-roll visuals, and lip-sync videos...", "info");
     try {
       void pingLocalWorkerWake("auto_produce");
-      const res = await fetch(`/api/stories/${storyId}/auto-produce`, { method: "POST" });
+      const res = await fetch(`/api/stories/${storyId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send-to-production", aspectRatio }),
+      });
       if (res.ok) {
         const freshStory = await fetch(`/api/stories/${storyId}`).then((r) => r.json());
         setStory(freshStory);
-        toast("Auto-Production Complete", "All scenes fully synced and commercial-ready!", "success");
+        toast("Auto-Production Queued", "Audio & presenter pipeline jobs queued for worker execution!", "success");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast("Auto-Produce Failed", err.error || "Error queueing auto-production.", "error");
       }
     } catch {
       toast("Auto-Produce Failed", "Error during auto-production.", "error");
     } finally {
       setIsAutoProducing(false);
     }
-  }, [storyId, setStory, toast]);
+  }, [storyId, aspectRatio, setStory, toast]);
 
   const handleRenderVideo = useCallback(async () => {
     setIsRendering(true);
     toast("Render Triggered", `Submitting Remotion render job (${renderQuality} quality)...`, "info");
     try {
-      const res = await fetch(`/api/stories/${storyId}/render`, {
+      const res = await fetch(`/api/stories/${storyId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quality: renderQuality }),
+        body: JSON.stringify({ action: "render", quality: renderQuality }),
       });
       if (res.ok) {
         void pingLocalWorkerWake("render_video");
+        const freshStory = await fetch(`/api/stories/${storyId}`).then((r) => r.json());
+        if (freshStory && !freshStory.error) {
+          setStory(freshStory);
+        }
         toast("Render In Progress", "Video rendering on GPU queue...", "success");
       } else {
-        toast("Render Failed", "Could not start render job.", "error");
+        const err = await res.json().catch(() => ({}));
+        toast("Render Failed", err.error || "Could not start render job.", "error");
       }
     } catch {
       toast("Render Error", "Network error starting render.", "error");
+    } finally {
+      setIsRendering(false);
     }
-  }, [storyId, renderQuality, toast]);
+  }, [storyId, renderQuality, setStory, toast]);
 
   const handleUpdatePresenter = useCallback(
     (data: Partial<PresenterConfig>) => {

@@ -1,8 +1,13 @@
 import { verifySegmentFact } from "@/lib/ai/factChecker";
 import { expandAcronyms } from "@/lib/ai/pronunciationDetector";
 import { translateNewsScript,type TargetLanguage } from "@/lib/ai/translator";
+import {
+  cleanJsonText,
+  generateLlmText,
+  getDefaultProvider,
+} from "@/lib/llm/aiSdkGateway";
 import { generateScript,normalizeTextForAudio } from "@/lib/llm/client";
-import { polishTextWithOllama } from "@/lib/llm/providers/ollama";
+import { POLISH_SCRIPT_PROMPT, buildPolishPrompt } from "@/lib/llm/prompts";
 import { prisma } from "@/lib/prisma";
 import { scrapeArticle } from "@/lib/scraper/articleScraper";
 import { searchStock } from "@/lib/stock";
@@ -403,7 +408,9 @@ export async function POST(
           },
           update: {
             status: VideoStatus.AWAITING_VOICE,
-            aspectRatio: body.aspectRatio ?? "vertical",
+            ...(typeof body.aspectRatio === "string" && body.aspectRatio
+              ? { aspectRatio: body.aspectRatio }
+              : {}),
           },
         });
 
@@ -491,6 +498,7 @@ export async function POST(
               videoId: existingVideo.id,
               aspectRatio,
               compositionId,
+              ...(typeof body.quality === "string" ? { quality: body.quality } : {}),
             }),
           },
         });
@@ -1155,9 +1163,37 @@ export async function POST(
       }
 
       case "polish-script": {
-        const text = body.text as string;
-        const mode = (body.mode || body.style || "cadence") as string;
-        const segmentId = body.segmentId as string | undefined;
+        const rawText = typeof body.text === "string" ? body.text : undefined;
+        const segmentId =
+          typeof body.segmentId === "string" && body.segmentId.trim()
+            ? body.segmentId.trim()
+            : undefined;
+        const rawMode =
+          (typeof body.mode === "string" && body.mode) ||
+          (typeof body.style === "string" && body.style) ||
+          undefined;
+        const mode = rawMode || (segmentId || rawText !== undefined ? "cadence" : "punchy");
+
+        const hasExplicitOllamaEnv = Boolean(
+          process.env.OLLAMA_BASE_URL?.trim() || process.env.OLLAMA_URL?.trim()
+        );
+        const allowFallback = hasExplicitOllamaEnv || getDefaultProvider() !== "gemini";
+
+        const polishWithLlmGateway = async (
+          inputText: string,
+          style: "punchy" | "short" | "tiktok" = "punchy"
+        ): Promise<string> => {
+          const { text: llmText } = await generateLlmText({
+            system: POLISH_SCRIPT_PROMPT,
+            prompt: buildPolishPrompt(inputText, style),
+            companyId: orgId,
+            storyId,
+            tier: "realtime",
+            temperature: 0.7,
+            allowFallback,
+          });
+          return llmText.trim() || inputText;
+        };
 
         if (mode === "all_segments") {
           // Polish all segments in the story for natural breathing cadence & TTS rhythm
@@ -1190,14 +1226,147 @@ export async function POST(
           const updatedSegments = await prisma.$transaction(updatePromises);
 
           return NextResponse.json({
+            ok: true,
             success: true,
             action: "polish-script",
             mode: "all_segments",
+            updatedCount: updatedSegments.length,
             segments: updatedSegments,
           });
         }
 
-        if (!text) {
+        // Story-wide AI polish (called without segmentId and without text, e.g. from Editor)
+        if (!segmentId && rawText === undefined) {
+          const storyScriptSegments = (
+            story.script as {
+              segments?: Array<{ id: string; index: number; text: string }>;
+            } | null
+          )?.segments;
+          const segments =
+            storyScriptSegments && storyScriptSegments.length > 0
+              ? storyScriptSegments
+              : await prisma.segment.findMany({
+                  where: { script: { storyId } },
+                  orderBy: { index: "asc" },
+                });
+
+          if (segments.length === 0) {
+            return NextResponse.json(
+              { error: "No script segments found to polish" },
+              { status: 400 }
+            );
+          }
+
+          const polishStyle = (
+            mode === "short" || mode === "tiktok" ? mode : "punchy"
+          ) as "punchy" | "short" | "tiktok";
+
+          const polishedMap = new Map<string, string>();
+
+          try {
+            const styleDirective =
+              polishStyle === "short"
+                ? "Make each segment significantly more concise while keeping the core news facts."
+                : polishStyle === "tiktok"
+                ? "Add energetic, high-impact hooks and fast broadcast cadence."
+                : "Make each segment sharper, more authoritative, and broadcast-ready.";
+
+            const batchSystemPrompt = `You are "Ruby," a world-class broadcast news script editor.
+Polish every segment of this broadcast script for spoken cadence, clarity, and impact.
+
+RULES:
+1. Keep the exact same language as each original segment.
+2. Preserve all factual claims, names, numbers, and inline tags (e.g. [urgent], [excited], [sfx:stinger], [pause: 0.3s]).
+3. Keep each segment's length similar to the original (±15%).
+4. ${styleDirective}
+5. Respond ONLY with valid JSON: {"segments":[{"id":"<segment_id>","text":"<polished_text>"}]}. Include every segment id.`;
+
+            const batchPayload = segments.map((s) => ({
+              id: s.id,
+              index: s.index,
+              text: s.text,
+            }));
+
+            const { text: batchResponse } = await generateLlmText({
+              system: batchSystemPrompt,
+              prompt: `Story Title: ${story.title}\nSegments:\n${JSON.stringify(batchPayload)}`,
+              companyId: orgId,
+              storyId,
+              tier: "structured",
+              temperature: 0.7,
+              allowFallback,
+            });
+
+            const cleanedJson = cleanJsonText(batchResponse);
+            const parsed = JSON.parse(cleanedJson) as
+              | { segments?: Array<{ id?: unknown; text?: unknown }> }
+              | Array<{ id?: unknown; text?: unknown }>;
+
+            const items = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray(parsed?.segments)
+              ? parsed.segments
+              : [];
+
+            for (const item of items) {
+              if (
+                item &&
+                typeof item.id === "string" &&
+                typeof item.text === "string" &&
+                item.text.trim().length > 0
+              ) {
+                polishedMap.set(item.id, item.text.trim());
+              }
+            }
+          } catch {
+            // Fall through to per-segment polishing via gateway below
+          }
+
+          const missingSegments = segments.filter((seg) => !polishedMap.has(seg.id));
+          if (missingSegments.length > 0) {
+            const perSegmentResults = await Promise.all(
+              missingSegments.map(async (seg) => {
+                const polished = await polishWithLlmGateway(seg.text, polishStyle);
+                return { id: seg.id, text: polished };
+              })
+            );
+            for (const item of perSegmentResults) {
+              polishedMap.set(item.id, item.text);
+            }
+          }
+
+          const updatedSegments = await prisma.$transaction(
+            segments.map((seg) =>
+              prisma.segment.update({
+                where: { id: seg.id },
+                data: { text: polishedMap.get(seg.id) ?? seg.text },
+              })
+            )
+          );
+
+          return NextResponse.json({
+            ok: true,
+            success: true,
+            action: "polish-script",
+            mode: polishStyle,
+            updatedCount: updatedSegments.length,
+            segments: updatedSegments,
+          });
+        }
+
+        let text = rawText;
+        if (text === undefined && segmentId) {
+          const seg = await prisma.segment.findFirst({
+            where: { id: segmentId, script: { storyId } },
+            select: { text: true },
+          });
+          if (!seg) {
+            return NextResponse.json({ error: "Segment not found" }, { status: 404 });
+          }
+          text = seg.text;
+        }
+
+        if (!text || !text.trim()) {
           return NextResponse.json({ error: "No text provided" }, { status: 400 });
         }
 
@@ -1217,8 +1386,10 @@ export async function POST(
           const chosen = emotions[Math.floor(Math.random() * emotions.length)];
           polished = `${chosen} ${text.replace(/^\[[a-zA-Z_]+\]\s*/, "")}`;
         } else {
-          // Fallback to Ollama
-          polished = await polishTextWithOllama(text, (mode === "short" || mode === "tiktok" ? mode : "punchy") as "punchy" | "short" | "tiktok");
+          const style = (
+            mode === "short" || mode === "tiktok" ? mode : "punchy"
+          ) as "punchy" | "short" | "tiktok";
+          polished = await polishWithLlmGateway(text, style);
         }
 
         if (segmentId) {
@@ -1229,6 +1400,7 @@ export async function POST(
         }
 
         return NextResponse.json({
+          ok: true,
           success: true,
           action: "polish-script",
           mode,
