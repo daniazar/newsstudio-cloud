@@ -33,6 +33,44 @@ export function setShuttingDown(val: boolean) {
   isShuttingDown = val;
 }
 
+/**
+ * Populate vendor/Modern-TTS-Server/checkpoints/piper from ModernVirtualCam's
+ * local Piper model cache if the vendor checkpoints folder has no .onnx weights yet.
+ */
+function ensureLocalPiperCheckpoints(modernTtsDir: string): void {
+  const piperCheckpointsDir = path.join(modernTtsDir, "checkpoints", "piper");
+  if (!fs.existsSync(piperCheckpointsDir)) return;
+
+  try {
+    const existing = fs.readdirSync(piperCheckpointsDir);
+    if (existing.some((f) => f.endsWith(".onnx"))) return;
+
+    const localAppData = process.env.LOCALAPPDATA;
+    if (!localAppData) return;
+
+    const fallbackModelsDir = path.join(localAppData, "ModernVirtualCam", "models", "piper");
+    if (!fs.existsSync(fallbackModelsDir)) return;
+
+    const candidates = fs
+      .readdirSync(fallbackModelsDir)
+      .filter((f) => f.endsWith(".onnx") || f.endsWith(".onnx.json"));
+    if (candidates.length === 0) return;
+
+    for (const file of candidates) {
+      fs.copyFileSync(path.join(fallbackModelsDir, file), path.join(piperCheckpointsDir, file));
+    }
+    log.info(
+      { count: candidates.length, from: fallbackModelsDir, to: piperCheckpointsDir },
+      "Staged local Piper ONNX checkpoints into Modern-TTS-Server"
+    );
+  } catch (err) {
+    log.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Failed to stage local Piper ONNX checkpoints"
+    );
+  }
+}
+
 export async function startModernTtsServer(): Promise<void> {
   const PORT = process.env.MODERN_TTS_PORT || 8005;
   const URL = process.env.MODERN_TTS_SERVER_URL || `http://localhost:${PORT}`;
@@ -54,6 +92,27 @@ export async function startModernTtsServer(): Promise<void> {
     : path.join(modernTtsDir, "venv/bin/python");
   const pyCmd = fs.existsSync(pyBin) ? pyBin : getPythonPath();
 
+  ensureLocalPiperCheckpoints(modernTtsDir);
+
+  const extraPathDirs: string[] = [];
+  if (path.isAbsolute(pyCmd)) {
+    const pyDir = path.dirname(pyCmd);
+    if (fs.existsSync(pyDir)) {
+      extraPathDirs.push(pyDir);
+    }
+  }
+  if (isWinOS && process.env.LOCALAPPDATA) {
+    const mvcPiperDir = path.join(process.env.LOCALAPPDATA, "ModernVirtualCam", "bin", "piper", "piper");
+    if (fs.existsSync(mvcPiperDir)) {
+      extraPathDirs.push(mvcPiperDir);
+    }
+  }
+  const existingPath = process.env.PATH || "";
+  const spawnPath =
+    extraPathDirs.length > 0
+      ? [...extraPathDirs, existingPath].filter((p) => p.length > 0).join(path.delimiter)
+      : existingPath;
+
   const activeProfile = process.env.TTS_PROFILE || "studio";
   let childExited = false;
   let exitInfo = "";
@@ -61,7 +120,7 @@ export async function startModernTtsServer(): Promise<void> {
   modernTtsProcess = spawn(pyCmd, ["server.py", "--port", String(PORT), "--profile", activeProfile], {
     cwd: modernTtsDir,
     stdio: "inherit",
-    env: { ...process.env, ...pythonUtf8Env, TTS_PROFILE: activeProfile },
+    env: { ...process.env, ...pythonUtf8Env, PATH: spawnPath, TTS_PROFILE: activeProfile },
   });
 
   modernTtsProcess.on("error", (err) => {
