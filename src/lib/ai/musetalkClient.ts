@@ -3,6 +3,7 @@ import { pooledFetch } from '@/lib/network/httpPool';
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from "@/lib/logger";
+import { resolveLocalActionLoopVideo, resolveLocalVeoDir } from "@/lib/storage/localAssets";
 
 const log = createLogger("ai:musetalkClient");
 
@@ -342,8 +343,12 @@ export async function generateMuseTalkCachedLipSync(
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.warn(`⚠️ [MuseTalk Client] Fast cache failed for '${avatarId}', attempting video fallback: ${errMsg}`);
+    const fallbackVideoPath =
+      effectiveCustomVideoPath ||
+      resolveLocalActionLoopVideo("ruby", "M1") ||
+      path.join(resolveLocalVeoDir(), "ruby_burgundy", "ruby_burgundy_M1_loop_v1.mp4");
     return generateMuseTalkLipSync({
-      videoPath: effectiveCustomVideoPath || path.join(process.cwd(), 'public', 'assets', 'action_loops', 'ruby_master_suite', 'ruby_idle.mp4'),
+      videoPath: fallbackVideoPath,
       audioPath,
       outputPath,
       fps,

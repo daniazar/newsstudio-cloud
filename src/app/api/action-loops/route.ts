@@ -3,6 +3,14 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
+import { createLogger } from "@/lib/logger";
+import {
+  resolveLocalAvatarsDir,
+  resolveLocalPublicFile,
+  resolveLocalVeoDir,
+} from "@/lib/storage/localAssets";
+
+const log = createLogger("api:action-loops");
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +19,7 @@ export async function GET(req: NextRequest) {
     const typeFilter = searchParams.get("type"); // "loop" | "transition" | "dynamic_loop"
     const poseFilter = searchParams.get("pose"); // "M1" | "M2" | ...
 
-    const veoDir = path.resolve(process.cwd(), "public/assets/action_loops/veo");
+    const veoDir = resolveLocalVeoDir();
     interface ManifestEntry {
       outputName: string;
       type?: string;
@@ -71,12 +79,14 @@ export async function GET(req: NextRequest) {
           (ent.name.toLowerCase() === personaParam || ent.name.toLowerCase().startsWith(`${personaParam}_`));
 
         if (isTargetDir) {
-          const manifestPath = path.join(veoDir, ent.name, "manifest.json");
+          const dirPath = path.join(veoDir, ent.name);
+          const manifestPath = path.join(dirPath, "manifest.json");
+          const attire = ent.name.replace(new RegExp(`^${personaParam}_?`, "i"), "") || "default";
+
           if (fs.existsSync(manifestPath)) {
             try {
               const raw = fs.readFileSync(manifestPath, "utf-8");
               const manifest = JSON.parse(raw);
-              const attire = ent.name.replace(new RegExp(`^${personaParam}_?`, "i"), "") || "default";
 
               for (const [id, entry] of Object.entries(manifest) as [string, ManifestEntry][]) {
                 const videoUrl = `/assets/action_loops/veo/${ent.name}/${entry.outputName}`;
@@ -103,7 +113,59 @@ export async function GET(req: NextRequest) {
                 });
               }
             } catch (err) {
-              console.error(`Error reading manifest for ${ent.name}:`, err);
+              log.error(
+                `Error reading manifest for ${ent.name}: ${err instanceof Error ? err.message : String(err)}`
+              );
+            }
+          } else {
+            const canonicalMp4s = fs
+              .readdirSync(dirPath)
+              .filter((f) => f.toLowerCase().endsWith(".mp4") && !f.includes("__"))
+              .sort((a, b) => a.localeCompare(b));
+
+            for (const filename of canonicalMp4s) {
+              const clipId = filename
+                .replace(/\.mp4$/i, "")
+                .replace(new RegExp(`^${ent.name}_`, "i"), "");
+              const transMatch = clipId.match(/^T(\d+)_to_(\d+)/i);
+              const poseMatch = clipId.match(/^(M\d+)/i);
+              const startPose = transMatch
+                ? `M${transMatch[1]}`
+                : poseMatch
+                  ? poseMatch[1].toUpperCase()
+                  : "M1";
+              const endPose = transMatch ? `M${transMatch[2]}` : startPose;
+              const type = transMatch
+                ? "transition"
+                : clipId.toLowerCase().includes("_loop")
+                  ? "loop"
+                  : "dynamic_loop";
+              let sizeBytes: number | undefined;
+              try {
+                sizeBytes = fs.statSync(path.join(dirPath, filename)).size;
+              } catch {}
+
+              items.push({
+                id: clipId,
+                persona: personaParam,
+                attire,
+                name: filename.replace(/\.mp4$/i, ""),
+                type,
+                startPose,
+                endPose,
+                videoUrl: `/assets/action_loops/veo/${ent.name}/${filename}`,
+                duration: 8.0,
+                totalFrames: 192,
+                fps: 24,
+                sizeBytes,
+                sha256: null,
+                peakEndSsim: null,
+                trimmedFrames: 0,
+                emotion: null,
+                rhetoricAction: null,
+                energyLevel: null,
+                poseState: startPose,
+              });
             }
           }
         }
@@ -128,15 +190,37 @@ export async function GET(req: NextRequest) {
         // Only add if not already in items from manifest
         if (!existingIds.has(dbLoop.actionName)) {
           existingIds.add(dbLoop.actionName);
+          const transMatch = dbLoop.actionName.match(/^T(\d+)_to_(\d+)/i);
+          const poseMatch = dbLoop.actionName.match(/^(M\d+)/i);
+          const derivedStartPose = transMatch
+            ? `M${transMatch[1]}`
+            : poseMatch
+              ? poseMatch[1].toUpperCase()
+              : (dbLoop.poseState || dbLoop.masterImage?.poseType || "M1");
+          const derivedEndPose = transMatch ? `M${transMatch[2]}` : derivedStartPose;
+          const derivedType = transMatch
+            ? "transition"
+            : dbLoop.actionName.toLowerCase().includes("_loop")
+              ? "loop"
+              : "dynamic_loop";
+          const cleanKey = dbLoop.pingPongVideoKey
+            ? dbLoop.pingPongVideoKey.replace(/^\/+/, "")
+            : "";
+          const videoUrl = cleanKey
+            ? cleanKey.startsWith("assets/") || cleanKey.startsWith("avatars/")
+              ? `/${cleanKey}`
+              : storage.getUrl(cleanKey)
+            : "";
+
           items.push({
             id: dbLoop.actionName,
             persona: personaParam,
             attire: dbLoop.masterImage?.attire || "default",
             name: dbLoop.actionName,
-            type: dbLoop.actionName.startsWith("T") ? "transition" : "loop",
-            startPose: dbLoop.masterImage?.poseType || "M1",
-            endPose: dbLoop.masterImage?.poseType || "M1",
-            videoUrl: dbLoop.pingPongVideoKey ? storage.getUrl(dbLoop.pingPongVideoKey) : "",
+            type: derivedType,
+            startPose: derivedStartPose,
+            endPose: derivedEndPose,
+            videoUrl,
             duration: dbLoop.durationSec,
             totalFrames: dbLoop.frameCount,
             fps: dbLoop.fps,
@@ -144,6 +228,10 @@ export async function GET(req: NextRequest) {
             sha256: dbLoop.latentsCacheKey || undefined,
             peakEndSsim: null,
             trimmedFrames: 0,
+            emotion: dbLoop.emotion || null,
+            rhetoricAction: dbLoop.rhetoricAction || null,
+            energyLevel: dbLoop.energyLevel || null,
+            poseState: dbLoop.poseState || derivedStartPose,
           });
         }
       }
@@ -184,7 +272,7 @@ export async function GET(req: NextRequest) {
     };
 
     // 3. Discover wardrobe poses from local archive (dev only — public/avatars/ doesn't exist in cloud)
-    const archiveDir = path.resolve(process.cwd(), `public/avatars/master_${personaParam}_archive`);
+    const archiveDir = path.join(resolveLocalAvatarsDir(), `master_${personaParam}_archive`);
     if (process.env.NODE_ENV !== "production" && fs.existsSync(archiveDir)) {
       const activeAttireSlugs = new Set(items.map((it) => it.attire));
       const subdirs = fs.readdirSync(archiveDir, { withFileTypes: true })
@@ -214,16 +302,24 @@ export async function GET(req: NextRequest) {
 
           if (match) {
             const relSrc = `/avatars/master_${personaParam}_archive/${dirName}/${match}`;
-            const loopMatch = items.find(
+            const sameAttireSamePose = items.filter(
               (it) =>
                 isSameAttire(it.attire, attireSlug) &&
-                (((it.startPose === pKey && it.endPose === pKey) ||
-                  it.id.toLowerCase().includes(`${pKey.toLowerCase()}_loop`)))
+                it.startPose === pKey &&
+                it.endPose === pKey
             );
+            const loopMatch =
+              sameAttireSamePose.find((it) => it.type === "loop") ||
+              sameAttireSamePose[0] ||
+              items.find(
+                (it) =>
+                  isSameAttire(it.attire, attireSlug) &&
+                  it.id.toLowerCase().includes(`${pKey.toLowerCase()}_loop`)
+              );
 
             const expectedVideoRel = `/assets/action_loops/veo/${personaParam}_${attireSlug}/${personaParam}_${attireSlug}_${pKey}_loop_v1.mp4`;
-            const expectedVideoFile = path.resolve(process.cwd(), `public${expectedVideoRel}`);
-            const videoUrl = loopMatch ? loopMatch.videoUrl : (fs.existsSync(expectedVideoFile) ? expectedVideoRel : undefined);
+            const expectedVideoFile = resolveLocalPublicFile(expectedVideoRel);
+            const videoUrl = loopMatch ? loopMatch.videoUrl : (expectedVideoFile ? expectedVideoRel : undefined);
 
             wardrobePoses.push({
               id: `${personaParam}_${attireSlug}_${pKey.toLowerCase()}`,
@@ -264,13 +360,29 @@ export async function GET(req: NextRequest) {
           if (seenPoses.has(uniqueKey)) continue;
           seenPoses.add(uniqueKey);
 
-          const src = m.url || (m.storageKey ? storage.getUrl(m.storageKey) : "");
+          const cleanStorageKey = m.storageKey.replace(/^\/+/, "");
+          const src =
+            m.url && m.url.startsWith("/")
+              ? m.url
+              : cleanStorageKey.startsWith("avatars/") || cleanStorageKey.startsWith("assets/")
+                ? `/${cleanStorageKey}`
+                : m.url || storage.getUrl(cleanStorageKey);
           const attireLabel = attireKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-          const loopMatch = items.find(
+          const poseMatchingItems = items.filter(
             (it) =>
-              it.attire === attireKey &&
-              (it.startPose === poseKey || it.id.toLowerCase().includes(`${poseKey.toLowerCase()}_loop`))
+              (it.attire === attireKey || isSameAttire(it.attire, attireKey)) &&
+              it.startPose === poseKey &&
+              it.endPose === poseKey
           );
+          const loopMatch =
+            poseMatchingItems.find((it) => it.type === "loop") ||
+            poseMatchingItems.find((it) => it.type === "dynamic_loop") ||
+            poseMatchingItems[0] ||
+            items.find(
+              (it) =>
+                (it.attire === attireKey || isSameAttire(it.attire, attireKey)) &&
+                it.id.toLowerCase().includes(`${poseKey.toLowerCase()}_loop`)
+            );
 
           wardrobePoses.push({
             id: m.id,

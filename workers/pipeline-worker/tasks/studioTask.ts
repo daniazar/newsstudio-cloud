@@ -20,6 +20,7 @@ import {
   getRemotionBinPath,
   getOptimalRemotionConcurrency,
 } from "@/lib/video/remotionUtils";
+import { rewritePropsToLocalMedia } from "@/lib/video/localMediaServer";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("worker:tasks:studioTask");
@@ -490,7 +491,11 @@ export async function stepStudioJob(
 
       const outputFile = path.join(sandboxDir, `studio-${studioType}-${jobId}.mp4`);
       const tempPropsFile = path.join(sandboxDir, `studio-props-${jobId}.json`);
-      fs.writeFileSync(tempPropsFile, JSON.stringify(inputProps));
+      const { props: localizedStudioProps, rewrittenCount } = await rewritePropsToLocalMedia(inputProps);
+      if (rewrittenCount > 0) {
+        log.info(`     ⚡ Rewrote ${rewrittenCount} studio media prop(s) to local worker HTTP stream.`);
+      }
+      fs.writeFileSync(tempPropsFile, JSON.stringify(localizedStudioProps));
 
       const normalizedPropsPath = tempPropsFile.replace(/\\/g, "/");
       const normalizedOutputPath = outputFile.replace(/\\/g, "/");

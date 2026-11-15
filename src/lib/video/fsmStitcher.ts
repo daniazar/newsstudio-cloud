@@ -21,6 +21,11 @@ import { optimizeScriptCadence } from "../audio/cadenceOptimizer";
 import { generateMuseTalkLipSync, checkMuseTalkHealth } from "../ai/musetalkClient";
 import { getFFmpegPath } from "../ai/comfy/utils";
 import { createLogger } from "@/lib/logger";
+import {
+  resolveLocalActionLoopVideo,
+  resolveLocalPublicFile,
+  resolveLocalVeoDir,
+} from "@/lib/storage/localAssets";
 
 const log = createLogger("video:fsmStitcher");
 
@@ -85,7 +90,13 @@ export function resolvePersonaActionLoop(
   state: FsmActionState = "M1_NEUTRAL_CLASPED"
 ): string {
   const normId = personaId.toLowerCase();
-  const veoDir = path.join(process.cwd(), "public", "assets", "action_loops", "veo");
+  const poseCode = state.match(/^(M[1-5])/i)?.[1]?.toUpperCase() || "M1";
+  const directMatch = resolveLocalActionLoopVideo(normId, poseCode);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const veoDir = resolveLocalVeoDir();
   const candidates: string[] = [];
 
   const burgundyDir = path.join(veoDir, "ruby_burgundy");
@@ -125,10 +136,12 @@ export function resolvePersonaActionLoop(
     }
   }
 
-  // Persona cache paths
+  // Persona cache & local public fallbacks
   candidates.push(path.join(process.cwd(), "storage", "cache", "latents", normId, "video.mp4"));
-  candidates.push(path.join(process.cwd(), "public", "action_library", `${normId}_idle_loop.mp4`));
-  candidates.push(path.join(process.cwd(), "public", "avatars", `${normId}.mp4`));
+  const libIdle = resolveLocalPublicFile(`action_library/${normId}_idle_loop.mp4`);
+  if (libIdle) candidates.push(libIdle);
+  const avatarVid = resolveLocalPublicFile(`avatars/${normId}.mp4`);
+  if (avatarVid) candidates.push(avatarVid);
   candidates.push(path.join(veoDir, "Create_a_second_video_Cinem.mp4"));
 
   // First check matching candidates

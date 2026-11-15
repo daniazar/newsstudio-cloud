@@ -14,6 +14,7 @@ import { promisify } from "util";
 import { pooledFetch } from "@/lib/network/httpPool";
 import { getPythonPath } from "@/lib/binaries";
 import { createLogger } from "@/lib/logger";
+import { resolveLocalActionLoopVideo, resolveLocalVeoDir } from "@/lib/storage/localAssets";
 
 const log = createLogger("ai:liveportraitClient");
 
@@ -130,14 +131,10 @@ export async function generateInvertedAvatarScene(
   const pythonExe = getPythonPath();
 
   const scriptPath = path.join(process.cwd(), "scripts", "musetalk", "inverted_realtime_pipeline.py");
-  const defaultBodyLoop = bodyLoopPath || path.join(
-    process.cwd(),
-    "public",
-    "assets",
-    "action_loops",
-    "ruby_master_suite",
-    "ruby_idle.mp4"
-  );
+  const defaultBodyLoop =
+    bodyLoopPath ||
+    resolveLocalActionLoopVideo(personaId, "M1") ||
+    path.join(resolveLocalVeoDir(), "ruby_burgundy", "ruby_burgundy_M1_loop_v1.mp4");
 
   const args = [
     scriptPath,
@@ -236,14 +233,10 @@ export async function generateIdleAvatarScene(
   const pythonExe = getPythonPath();
 
   const scriptPath = path.join(process.cwd(), "scripts", "musetalk", "inverted_realtime_pipeline.py");
-  const defaultBodyLoop = bodyLoopPath || path.join(
-    process.cwd(),
-    "public",
-    "assets",
-    "action_loops",
-    "ruby_master_suite",
-    "ruby_idle.mp4"
-  );
+  const defaultBodyLoop =
+    bodyLoopPath ||
+    resolveLocalActionLoopVideo(personaId, "M1") ||
+    path.join(resolveLocalVeoDir(), "ruby_burgundy", "ruby_burgundy_M1_loop_v1.mp4");
 
   const args = [
     scriptPath,

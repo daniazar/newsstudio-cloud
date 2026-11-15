@@ -136,9 +136,9 @@ export function swapScenePersonaWithMediaHistory(
     defaultPoseId = "mateo_default_trait_m1";
     defaultVideoUrl = "/assets/action_loops/veo/mateo_default_trait/mateo_default_trait_M1_loop_v1.mp4";
   } else if (isNewBlaze) {
-    defaultActionLoopId = "blaze_silver_blazer_m1_loop_v1";
+    defaultActionLoopId = "blaze_silver_blazer_m1_dynamic_v1";
     defaultPoseId = "blaze_silver_blazer_m1";
-    defaultVideoUrl = "/assets/action_loops/veo/blaze_silver_blazer/blaze_silver_blazer_M1_loop_v1.mp4";
+    defaultVideoUrl = "/assets/action_loops/veo/blaze_silver_blazer/blaze_silver_blazer_M1_dynamic_v1.mp4";
   }
 
   const updatedConfig = {

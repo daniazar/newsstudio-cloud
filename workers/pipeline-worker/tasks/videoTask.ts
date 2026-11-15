@@ -24,6 +24,7 @@ import { PRICING } from "@/lib/constants/pricing";
 import { JobCancelledError, WorkerSegment } from "./audioTask";
 import { generateVeoVideo, isVeoConfigured } from "@/lib/ai/veoClient";
 import { createLogger } from "@/lib/logger";
+import { resolveLocalActionLoopVideo, resolveLocalPublicFile } from "@/lib/storage/localAssets";
 
 const log = createLogger("worker:tasks:videoTask");
 
@@ -33,64 +34,60 @@ const execFileAsync = promisify(execFile);
 const actionLoopCache = new Map<string, string>();
 
 /**
- * Resolves the best available pre-rendered action loop or base video for a persona.
+ * Resolves the best available pre-rendered action loop or base video for a persona
+ * from the worker's local disk first.
  */
 export function resolveActionLoopVideo(personaId: string): string | null {
   const normId = personaId.toLowerCase();
   const cached = actionLoopCache.get(normId);
-  if (cached) return cached;
+  if (cached && fs.existsSync(cached)) return cached;
 
-  const poolDir = path.join(process.cwd(), "public", "assets", "action_loops", "veo");
-
-  const candidatePaths = [
-    path.join(poolDir, `veo_${normId}_p01_standing_clasped_9x16_master.mp4`),
-    path.join(poolDir, `veo_${normId}_p01_subtle_beat_4s_master.mp4`),
-    path.join(poolDir, `veo_${normId}_p03_idle_4s_9672.mp4`),
-    path.join(process.cwd(), "storage", "cache", "latents", normId, "video.mp4"),
-    path.join(process.cwd(), "storage", "cache", "latents", normId, "B01_p01_neutral_clasped", "video.mp4"),
-    path.join(process.cwd(), "public", "action_library", `${normId}_idle_loop.mp4`),
-    path.join(process.cwd(), "public", "action_library", `${normId}_standing_bg.mp4`),
-    path.join(process.cwd(), "public", "avatars", `${normId}.mp4`),
-  ];
-
-  for (const p of candidatePaths) {
-    if (fs.existsSync(p)) {
-      actionLoopCache.set(normId, p);
-      return p;
-    }
+  const resolved = resolveLocalActionLoopVideo(normId);
+  if (resolved) {
+    actionLoopCache.set(normId, resolved);
+    return resolved;
   }
 
-  // Check persona subdirectories inside public/assets/action_loops/veo (e.g. ruby_burgundy, taylor_forest_green_powersuit)
-  if (fs.existsSync(poolDir)) {
-    const subdirs = fs.readdirSync(poolDir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.endsWith("_backup") && d.name !== "analysis");
-    for (const sub of subdirs) {
-      if (sub.name.toLowerCase().startsWith(normId) || sub.name.toLowerCase().includes(normId)) {
-        const subPath = path.join(poolDir, sub.name);
-        const subFiles = fs.readdirSync(subPath).filter((f) => f.endsWith(".mp4"));
-        const m1Loop = subFiles.find((f) => f.includes("M1_loop_v1") || f.includes("M1_loop") || f.includes("_m1_"));
-        if (m1Loop) {
-          const match = path.join(subPath, m1Loop);
-          actionLoopCache.set(normId, match);
-          return match;
-        }
-        if (subFiles.length > 0) {
-          const match = path.join(subPath, subFiles[0]);
-          actionLoopCache.set(normId, match);
-          return match;
-        }
+  return null;
+}
+
+async function resolveSegmentAvatarPath(
+  segment: WorkerSegment,
+  persona: { avatarUrl?: string } | undefined,
+  tmpDir: string
+): Promise<string> {
+  const localFromSegment = segment.personaAvatarUrl
+    ? resolveLocalPublicFile(segment.personaAvatarUrl)
+    : null;
+  if (localFromSegment) {
+    return localFromSegment;
+  }
+
+  const localFromPersona = persona?.avatarUrl
+    ? resolveLocalPublicFile(persona.avatarUrl)
+    : null;
+  if (localFromPersona) {
+    return localFromPersona;
+  }
+
+  if (segment.personaAvatarUrl && /^https?:\/\//i.test(segment.personaAvatarUrl)) {
+    try {
+      const avatarRes = await fetch(segment.personaAvatarUrl);
+      if (avatarRes.ok) {
+        const avatarBuf = Buffer.from(await avatarRes.arrayBuffer());
+        const avatarTmp = path.join(tmpDir, `avatar-${segment.id}.png`);
+        fs.writeFileSync(avatarTmp, avatarBuf);
+        return avatarTmp;
       }
-    }
-
-    const files = fs.readdirSync(poolDir).filter((f) => f.endsWith(".mp4"));
-    if (files.length > 0) {
-      const match = path.join(poolDir, files[0]);
-      actionLoopCache.set(normId, match);
-      return match;
+    } catch {
+      // Fallback to local default avatar below
     }
   }
 
-  actionLoopCache.set(normId, candidatePaths[0]);
-  return candidatePaths[0];
+  return (
+    resolveLocalPublicFile("/avatars/ruby.png") ||
+    path.join(process.cwd(), "public", "avatars", "ruby.png")
+  );
 }
 
 export async function stepVideo(
@@ -240,11 +237,7 @@ export async function stepVideo(
         try {
           log.info(`     🕺 [Ditto:8010] Generating Motion-Space Talking Head for persona [${personaId}]...`);
           const masterVideoPath = resolveActionLoopVideo(personaId);
-          const avatarAbsPath = path.join(
-            process.cwd(),
-            "public",
-            (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-          );
+          const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
 
           const dittoRes = await generateTalkingHeadInference({
             modelId: "ditto",
@@ -343,11 +336,7 @@ export async function stepVideo(
         const isEchoOnline = await checkEchoMimicHealth();
         if (isEchoOnline) {
           try {
-            const avatarAbsPath = path.join(
-              process.cwd(),
-              "public",
-              (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-            );
+            const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
             const masterVideoPath = resolveActionLoopVideo(personaId);
 
             log.info(`     🕺 [EchoMimic V3:8006] Generating half-body motion + lip-sync for persona [${personaId}]...`);
@@ -381,21 +370,7 @@ export async function stepVideo(
       ) {
         log.info(`     🌟 [Google Veo 3.1 API] Generating high-fidelity presenter video...`);
         try {
-          let avatarAbsPath = path.join(
-            process.cwd(),
-            "public",
-            (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-          );
-
-          if (segment.personaAvatarUrl && (segment.personaAvatarUrl.startsWith("http://") || segment.personaAvatarUrl.startsWith("https://"))) {
-            const avatarRes = await fetch(segment.personaAvatarUrl);
-            if (avatarRes.ok) {
-              const avatarBuf = Buffer.from(await avatarRes.arrayBuffer());
-              const avatarTmp = path.join(tmpDir, `avatar-${segment.id}.png`);
-              fs.writeFileSync(avatarTmp, avatarBuf);
-              avatarAbsPath = avatarTmp;
-            }
-          }
+          const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
 
           const personaPrompt = segment.personaImagePrompt ||
             `A professional television news anchor presenting news in a modern high-tech broadcast studio set. Sharp cinematic lighting, photorealistic, broadcast quality: ${segment.text || ""}`;
@@ -443,21 +418,7 @@ export async function stepVideo(
         log.info(`     ⚡ [MiniMax+TaoMate:8188] Generating ultra-fast distilled video via ComfyUI...`);
         const genStartTime = Date.now();
         try {
-          let avatarAbsPath = path.join(
-            process.cwd(),
-            "public",
-            (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-          );
-
-          if (segment.personaAvatarUrl && (segment.personaAvatarUrl.startsWith("http://") || segment.personaAvatarUrl.startsWith("https://"))) {
-            const avatarRes = await fetch(segment.personaAvatarUrl);
-            if (avatarRes.ok) {
-              const avatarBuf = Buffer.from(await avatarRes.arrayBuffer());
-              const avatarTmp = path.join(tmpDir, `avatar-${segment.id}.png`);
-              fs.writeFileSync(avatarTmp, avatarBuf);
-              avatarAbsPath = avatarTmp;
-            }
-          }
+          const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
 
           const comfyModel: "minimax_taomate" | "minimax_h3" = (segmentStrategy.includes("taomate") || segmentStrategy === "minimax" || preferredEngine === "minimax" || preferredEngine === "taomate") ? "minimax_taomate" : "minimax_h3";
           const workflow = loadWorkflow(comfyModel);
@@ -496,21 +457,7 @@ export async function stepVideo(
         const genStartTime = Date.now();
         try {
           // Resolve persona avatar image
-          let avatarAbsPath = path.join(
-            process.cwd(),
-            "public",
-            (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-          );
-
-          if (segment.personaAvatarUrl && (segment.personaAvatarUrl.startsWith("http://") || segment.personaAvatarUrl.startsWith("https://"))) {
-            const avatarRes = await fetch(segment.personaAvatarUrl);
-            if (avatarRes.ok) {
-              const avatarBuf = Buffer.from(await avatarRes.arrayBuffer());
-              const avatarTmp = path.join(tmpDir, `avatar-${segment.id}.png`);
-              fs.writeFileSync(avatarTmp, avatarBuf);
-              avatarAbsPath = avatarTmp;
-            }
-          }
+          const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
 
           // Determine ComfyUI model variant (wan_alpha or ltx_2.5 or ltx)
           const comfyModel: "wan_alpha" | "ltx_2.5" = segmentStrategy.includes("wan") ? "wan_alpha" : "ltx_2.5";
@@ -546,11 +493,7 @@ export async function stepVideo(
           // Self-healing fallback to Veo API if ComfyUI failed or is offline
           if (isVeoConfigured()) {
             log.info(`     🔄 [Self-Healing] Falling back to Google Veo 3.1 API...`);
-            const avatarAbsPath = path.join(
-              process.cwd(),
-              "public",
-              (persona?.avatarUrl || "/avatars/ruby.png").replace(/^\//, "")
-            );
+            const avatarAbsPath = await resolveSegmentAvatarPath(segment, persona, tmpDir);
             const veoFallbackRes = await generateVeoVideo({
               prompt: segment.personaImagePrompt || `Professional news anchor: ${segment.text || ""}`,
               imagePath: fs.existsSync(avatarAbsPath) ? avatarAbsPath : undefined,

@@ -39,6 +39,7 @@ import {
   getRemotionBinPath,
   getOptimalRemotionConcurrency,
 } from "@/lib/video/remotionUtils";
+import { rewritePropsToLocalMedia } from "@/lib/video/localMediaServer";
 
 const execFileAsync = promisify(execFile);
 
@@ -217,11 +218,11 @@ export async function renderOmnichannelBatch(
     const outFile = path.join(outDir, `ad_${format.key}_${format.resolution}.mp4`);
     const propsFile = path.join(outDir, `props_${format.key}.json`);
 
-    fs.writeFileSync(propsFile, JSON.stringify(formatProps, null, 2));
-
     let qaReport: ForensicQaReport;
 
     if (!dryRun) {
+      const { props: localizedProps } = await rewritePropsToLocalMedia(formatProps);
+      fs.writeFileSync(propsFile, JSON.stringify(localizedProps, null, 2));
       const normalizedProps = propsFile.replace(/\\/g, "/");
       const normalizedOut = outFile.replace(/\\/g, "/");
       const { entryPoint } = getRemotionEntryPoint();
@@ -279,6 +280,7 @@ export async function renderOmnichannelBatch(
         });
       }
     } else {
+      fs.writeFileSync(propsFile, JSON.stringify(formatProps, null, 2));
       // Dry-run simulated report
       qaReport = generateHeuristicQaReport([], {
         title: productSpec.title,

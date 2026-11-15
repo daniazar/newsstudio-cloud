@@ -11,6 +11,7 @@ import {
 } from "@/lib/video/remotionUtils";
 import { getFFmpegPath, getFFprobePath } from "@/lib/binaries";
 import { createLogger } from "@/lib/logger";
+import { rewritePropsToLocalMedia } from "@/lib/video/localMediaServer";
 
 const log = createLogger("worker:render-task");
 
@@ -39,7 +40,11 @@ export async function executeRenderTask(
   }
 
   const tempPropsFile = path.join(process.cwd(), `tmp-props-${videoId}.json`);
-  fs.writeFileSync(tempPropsFile, JSON.stringify(inputProps));
+  const { props: localizedProps, rewrittenCount } = await rewritePropsToLocalMedia(inputProps);
+  if (rewrittenCount > 0) {
+    log.info(`  ⚡ Rewrote ${rewrittenCount} prop media reference(s) to local loopback disk stream.`);
+  }
+  fs.writeFileSync(tempPropsFile, JSON.stringify(localizedProps));
 
   const { entryPoint } = getRemotionEntryPoint();
   const remotionBin = getRemotionBinPath();

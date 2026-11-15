@@ -236,8 +236,11 @@ export const NewsComposition: React.FC<CompositionProps> = ({
                       name: currentSegment?.speaker === "blaze" ? "Blaze Wilder" : "Dr. Mateo Beltrán",
                       role: currentSegment?.speaker === "blaze" ? "Tech Analyst" : "Chief AI Officer",
                       location: "STUDIO 2 • SILICON VALLEY",
-                      videoSrc: "/assets/action_loops/veo/veo_blaze_p03_idle_4s_9672.mp4",
-                      imageSrc: "/avatars/blaze.png",
+                      videoSrc:
+                        currentSegment?.speaker === "blaze"
+                          ? "/assets/action_loops/veo/blaze_silver_blazer/blaze_silver_blazer_M1_dynamic_v1.mp4"
+                          : "/assets/action_loops/veo/mateo_default_trait/mateo_default_trait_M1_loop_v1.mp4",
+                      imageSrc: currentSegment?.speaker === "blaze" ? "/avatars/blaze.png" : "/avatars/mateo.png",
                       isSpeaking: currentSegment?.speaker === "guest" || currentSegment?.speaker === "blaze",
                     }}
                   />

@@ -2,18 +2,27 @@ import fs from "fs";
 import { hostname } from "os";
 import path from "path";
 import { createLogger } from "@/lib/logger";
+import {
+  getLocalActionLoopsRoots,
+  resolveLocalAvatarsDir,
+  resolveLocalPublicFile,
+  resolveLocalPublicRoot as resolveSharedLocalPublicRoot,
+} from "@/lib/storage/localAssets";
 
 const log = createLogger("worker:config");
 
 /**
  * Resolve external VENDOR_ROOT (for ComfyUI, Modern-TTS-Server, Modern-TalkingHead-Server)
- * using priority: process.env.VENDOR_ROOT -> ./vendor -> ../newsStudio/vendor.
+ * checking process.env.VENDOR_ROOT and repo-relative sibling paths.
  */
 export function resolveVendorRoot(): string {
+  const cwd = process.cwd();
   const candidates = [
     process.env.VENDOR_ROOT,
-    path.resolve(process.cwd(), "vendor"),
-    path.resolve(process.cwd(), "..", "newsStudio", "vendor"),
+    path.resolve(cwd, "vendor"),
+    path.resolve(cwd, "..", "newsStudio", "vendor"),
+    path.resolve(cwd, "..", "..", "newsStudio", "vendor"),
+    path.resolve(cwd, "..", "..", "..", "newsStudio", "vendor"),
   ].filter((p): p is string => Boolean(p && p.trim().length > 0));
 
   for (const candidate of candidates) {
@@ -21,26 +30,29 @@ export function resolveVendorRoot(): string {
       return candidate;
     }
   }
-  return candidates[0] || path.resolve(process.cwd(), "vendor");
+  return candidates[0] || path.resolve(cwd, "vendor");
 }
 
 /**
- * Resolve external LOCAL_AVATARS_ROOT using priority:
- * process.env.LOCAL_AVATARS_ROOT -> ./public/avatars -> ../newsStudio/public/avatars.
+ * Resolve local `public/` root (prefers LOCAL_PUBLIC_ROOT or sibling newsStudio/public).
+ */
+export function resolveLocalPublicRoot(): string {
+  return resolveSharedLocalPublicRoot();
+}
+
+/**
+ * Resolve local `assets/action_loops` root.
+ */
+export function resolveLocalActionLoopsRoot(): string {
+  const roots = getLocalActionLoopsRoots();
+  return roots[0] || path.join(resolveSharedLocalPublicRoot(), "assets", "action_loops");
+}
+
+/**
+ * Resolve external LOCAL_AVATARS_ROOT using shared localAssets discovery.
  */
 export function resolveLocalAvatarsRoot(): string {
-  const candidates = [
-    process.env.LOCAL_AVATARS_ROOT,
-    path.resolve(process.cwd(), "public", "avatars"),
-    path.resolve(process.cwd(), "..", "newsStudio", "public", "avatars"),
-  ].filter((p): p is string => Boolean(p && p.trim().length > 0));
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return candidates[0] || path.resolve(process.cwd(), "public", "avatars");
+  return resolveLocalAvatarsDir();
 }
 
 /**
@@ -49,19 +61,8 @@ export function resolveLocalAvatarsRoot(): string {
  */
 export function resolveLocalAvatarFile(relativeFile: string): string | null {
   const cleanRel = relativeFile.replace(/^[/\\]+/, "");
-  const roots = [
-    process.env.LOCAL_AVATARS_ROOT,
-    path.resolve(process.cwd(), "public", "avatars"),
-    path.resolve(process.cwd(), "..", "newsStudio", "public", "avatars"),
-  ].filter((p): p is string => Boolean(p && p.trim().length > 0));
-
-  for (const root of roots) {
-    const fullPath = path.join(root, cleanRel);
-    if (fs.existsSync(fullPath)) {
-      return fullPath;
-    }
-  }
-  return null;
+  const asAvatarRel = cleanRel.startsWith("avatars/") ? cleanRel : `avatars/${cleanRel}`;
+  return resolveLocalPublicFile(asAvatarRel) || resolveLocalPublicFile(cleanRel);
 }
 
 /**
@@ -92,6 +93,12 @@ export const config = {
   /** External vendor root */
   vendorRoot: resolveVendorRoot(),
 
+  /** External local public root */
+  localPublicRoot: resolveLocalPublicRoot(),
+
+  /** External local action loops root */
+  localActionLoopsRoot: resolveLocalActionLoopsRoot(),
+
   /** External local avatars root */
   localAvatarsRoot: resolveLocalAvatarsRoot(),
 
@@ -121,6 +128,8 @@ export function validateConfig(): void {
   log.info(`   Wake Port:      127.0.0.1:${config.wakePort}`);
   log.info(`   Safety Poll:    ${config.dbSafetyPollMs}ms`);
   log.info(`   Vendor Root:    ${config.vendorRoot}`);
+  log.info(`   Public Root:    ${config.localPublicRoot}`);
+  log.info(`   Loops Root:     ${config.localActionLoopsRoot}`);
   log.info(`   Avatars Root:   ${config.localAvatarsRoot}`);
   log.info(`   Concurrency:    ${config.concurrency}`);
   log.info(`   Heartbeat:      ${config.heartbeatIntervalMs}ms`);

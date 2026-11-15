@@ -56,6 +56,8 @@ import {
 } from "@/lib/video/remotionUtils";
 import { reportProgress } from "../api";
 import { config as workerConfig, resolveLocalAvatarFile } from "../config";
+import { resolveLocalPublicFile } from "@/lib/storage/localAssets";
+import { rewritePropsToLocalMedia } from "@/lib/video/localMediaServer";
 import { JobCancelledError } from "./audioTask";
 import { findAndSyncArtifact } from "../../../scripts/gemini-cli/artifactManager";
 import { findAndSyncVideoArtifact } from "../../../scripts/veo-cli/artifactManager";
@@ -103,22 +105,15 @@ async function emitProgress(
 }
 
 function resolveLocalPublicCandidate(relOrUrl: string): string | null {
+  const sharedMatch = resolveLocalPublicFile(relOrUrl);
+  if (sharedMatch) return sharedMatch;
+
   const cleanRel = relOrUrl.split("?")[0].replace(/^[/\\]+/, "");
   if (cleanRel.startsWith("avatars/") || !cleanRel.includes("/")) {
     const avatarMatch = resolveLocalAvatarFile(cleanRel.replace(/^avatars\//, ""));
     if (avatarMatch) return avatarMatch;
   }
 
-  const candidates = [
-    path.resolve(process.cwd(), "public", cleanRel),
-    path.resolve(process.cwd(), "..", "newsStudio", "public", cleanRel),
-    path.resolve(process.cwd(), cleanRel),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) {
-      return c;
-    }
-  }
   return null;
 }
 
@@ -835,7 +830,11 @@ async function handleEcommerceRender(
   const videoId = String(cfg.videoId || `ecommerce_render_${Date.now()}`);
   const propsFile = path.join(tmpDir, "props.json");
   const outFile = path.join(tmpDir, `${videoId}.mp4`);
-  fs.writeFileSync(propsFile, JSON.stringify(cfg.inputProps || {}));
+  const { props: localizedProps, rewrittenCount } = await rewritePropsToLocalMedia(cfg.inputProps || {});
+  if (rewrittenCount > 0) {
+    log.info(`[ecommerce_render] Rewrote ${rewrittenCount} media prop(s) to local worker HTTP stream.`);
+  }
+  fs.writeFileSync(propsFile, JSON.stringify(localizedProps));
 
   const { entryPoint } = getRemotionEntryPoint();
   const remotionBin = getRemotionBinPath();
