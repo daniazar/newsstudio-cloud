@@ -42,6 +42,10 @@ const nextConfig: NextConfig = {
         source: "/studio_plates/:path*",
         destination: `${publicS3Url}/studio_plates/:path*`,
       },
+      {
+        source: "/studio_environments/:path*",
+        destination: `${publicS3Url}/studio_environments/:path*`,
+      },
     ];
   },
   // Cap static generation workers to 4 (prevents 23 workers from exhausting RAM and thrashing pagefile)

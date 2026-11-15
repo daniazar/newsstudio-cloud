@@ -226,4 +226,29 @@ describe("Local Worker Wake Port (8766) & Bridge Suite", () => {
       "form-action 'self' https://*.clerk.accounts.dev https://accounts.google.com"
     );
   });
+
+  it("rewrites /studio_environments/:path* to R2 public URL when NEXT_PUBLIC_S3_PUBLIC_URL is set", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_S3_PUBLIC_URL", "https://pub-test-r2.r2.dev/");
+    const freshConfig = (await import("../../../../next.config")).default;
+    const rules = await freshConfig.rewrites!();
+    vi.unstubAllEnvs();
+
+    expect(rules).toEqual(
+      expect.arrayContaining([
+        {
+          source: "/avatars/:path*",
+          destination: "https://pub-test-r2.r2.dev/avatars/:path*",
+        },
+        {
+          source: "/studio_plates/:path*",
+          destination: "https://pub-test-r2.r2.dev/studio_plates/:path*",
+        },
+        {
+          source: "/studio_environments/:path*",
+          destination: "https://pub-test-r2.r2.dev/studio_environments/:path*",
+        },
+      ])
+    );
+  });
 });

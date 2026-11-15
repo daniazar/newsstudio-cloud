@@ -22,6 +22,21 @@ import {
 import { TtsEngineType } from "./textPreprocessor";
 import type { VoiceParams } from "./voicePresets";
 
+function isLocalModernTtsBlockedInCloudBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") {
+    return false;
+  }
+  const targetUrl =
+    process.env.NEXT_PUBLIC_MODERN_TTS_SERVER_URL || "http://localhost:8005";
+  return (
+    targetUrl.includes("localhost") ||
+    targetUrl.includes("127.0.0.1") ||
+    targetUrl.includes("::1")
+  );
+}
+
 export interface GenerationProgress {
   phase: string;
   stage: string;
@@ -113,6 +128,19 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const checkHealthCallback = useCallback(async (): Promise<ModernTtsHealth> => {
+    if (isLocalModernTtsBlockedInCloudBrowser()) {
+      const h: ModernTtsHealth = {
+        status: "offline",
+        error: "Direct localhost Modern-TTS probes disabled on cloud origin",
+      };
+      if (isMountedRef.current) {
+        setHealth(h);
+        setServerOnline(false);
+        setModelStatus("error");
+      }
+      return h;
+    }
+
     try {
       const h = await checkModernTtsHealth();
       if (isMountedRef.current) {
@@ -146,6 +174,9 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
 
     const init = async () => {
       await checkHealthCallback();
+      if (isLocalModernTtsBlockedInCloudBrowser()) {
+        return;
+      }
       try {
         const p = await getTtsProfile();
         if (!isCancelled && isMountedRef.current && p.profile) {
@@ -186,6 +217,7 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
   }, []);
 
   const clearCache = useCallback(async () => {
+    if (isLocalModernTtsBlockedInCloudBrowser()) return;
     try {
       await freeModernTtsMemory();
     } catch {
@@ -194,6 +226,12 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
   }, []);
 
   const setProfileTier = useCallback(async (tier: TtsProfileTier) => {
+    if (isLocalModernTtsBlockedInCloudBrowser()) {
+      if (isMountedRef.current) {
+        setActiveProfile(tier);
+      }
+      return;
+    }
     try {
       const res = await setTtsProfile(tier);
       if (isMountedRef.current) {
@@ -213,6 +251,7 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
   }, [checkServerHealth]);
 
   const stopServer = useCallback(async () => {
+    if (isLocalModernTtsBlockedInCloudBrowser()) return;
     try {
       await freeModernTtsMemory();
     } catch {
@@ -246,6 +285,10 @@ export function useModernTts(initialOptions: ModernTtsOptions = {}): UseModernTt
     ): Promise<ArrayBuffer | null> => {
       if (!text || !text.trim()) {
         setError("Text is empty");
+        return null;
+      }
+      if (isLocalModernTtsBlockedInCloudBrowser()) {
+        setError("Direct browser calls to localhost Modern-TTS are disabled in cloud mode.");
         return null;
       }
 
