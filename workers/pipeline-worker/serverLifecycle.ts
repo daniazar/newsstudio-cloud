@@ -23,6 +23,12 @@ export let comfyuiProcess: ReturnType<typeof spawn> | null = null;
 
 let isShuttingDown = false;
 
+const pythonUtf8Env = {
+  PYTHONUTF8: "1",
+  PYTHONIOENCODING: "utf-8",
+  PYTHONUNBUFFERED: "1",
+};
+
 export function setShuttingDown(val: boolean) {
   isShuttingDown = val;
 }
@@ -49,14 +55,34 @@ export async function startModernTtsServer(): Promise<void> {
   const pyCmd = fs.existsSync(pyBin) ? pyBin : getPythonPath();
 
   const activeProfile = process.env.TTS_PROFILE || "studio";
+  let childExited = false;
+  let exitInfo = "";
+
   modernTtsProcess = spawn(pyCmd, ["server.py", "--port", String(PORT), "--profile", activeProfile], {
     cwd: modernTtsDir,
     stdio: "inherit",
-    env: { ...process.env, TTS_PROFILE: activeProfile, PYTHONUNBUFFERED: "1" },
+    env: { ...process.env, ...pythonUtf8Env, TTS_PROFILE: activeProfile },
+  });
+
+  modernTtsProcess.on("error", (err) => {
+    childExited = true;
+    exitInfo = err.message;
+    modernTtsProcess = null;
+    log.error({ err: err.message }, "Failed to start Modern TTS Server");
+  });
+
+  modernTtsProcess.on("exit", (code, signal) => {
+    childExited = true;
+    exitInfo = `code=${code ?? "null"}, signal=${signal ?? "null"}`;
+    modernTtsProcess = null;
+    log.warn({ code, signal }, "Modern TTS Server process exited");
   });
 
   for (let i = 0; i < 60; i++) {
     if (isShuttingDown) break;
+    if (childExited) {
+      throw new Error(`Modern TTS Server process exited during startup (${exitInfo})`);
+    }
     try {
       const res = await fetch(healthUrl, { signal: AbortSignal.timeout(1000) });
       if (res.ok) {
@@ -120,7 +146,7 @@ export async function startModernTalkingHeadServer(): Promise<void> {
     modernTalkingHeadProcess = spawn(pyCmd, ["server.py", "--port", String(PORT)], {
       cwd: talkingHeadDir,
       stdio: "inherit",
-      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      env: { ...process.env, ...pythonUtf8Env },
     });
 
     modernTalkingHeadProcess.on("error", (err) => console.error("  ❌ Failed to start Modern TalkingHead Server:", err));
@@ -202,6 +228,7 @@ export async function startComfyUIServer(): Promise<void> {
     ? path.join(comfyDir, "venv/Scripts/python.exe")
     : getPythonPath();
 
+  Object.assign(env, pythonUtf8Env);
   env.PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True";
   comfyuiProcess = spawn(comfyPythonCmd, ["main.py", "--reserve-vram", "2.5", "--vram-headroom", "1.0", "--disable-pinned-memory", "--port", String(COMFYUI_PORT)], {
     cwd: comfyDir,
