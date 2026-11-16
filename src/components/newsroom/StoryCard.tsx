@@ -115,7 +115,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
       hover
       className={`!p-4 group transition-all duration-200 flex flex-col justify-between h-full min-h-[160px] relative rounded-2xl glass-panel-raised border ${
         isSelected
-          ? "border-emerald-500/80 bg-emerald-500/[0.04] ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10"
+          ? "border-accent/80 bg-accent/[0.04] ring-1 ring-accent/50 shadow-lg shadow-accent/10"
           : "border-border/80 hover:border-border-hover"
       }`}
     >
@@ -130,9 +130,9 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                 checked={isSelected}
                 onChange={() => onToggleSelection(story.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-4 h-4 mt-0.5 rounded border-border/80 bg-surface text-emerald-500 focus:ring-emerald-500 cursor-pointer flex-shrink-0 accent-emerald-500"
+                className="w-4 h-4 mt-0.5 rounded border-border/80 bg-surface text-accent focus:ring-accent cursor-pointer flex-shrink-0 accent-accent"
               />
-              <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 group-hover:text-emerald-400 transition-colors pr-1">
+              <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 group-hover:text-accent transition-colors pr-1">
                 {story.title}
               </h3>
             </div>
@@ -154,7 +154,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
 
           {/* Metadata Sub-header */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-mono text-muted">
-            <span className="text-emerald-400 font-bold">{story.feed.name}</span>
+            <span className="text-accent font-bold">{story.feed.name}</span>
             {story.category && (
               <>
                 <span className="text-muted/40">•</span>
@@ -206,7 +206,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                     e.stopPropagation();
                     onViewAssets?.(story);
                   }}
-                  className="flex items-center gap-1 hover:text-emerald-400 cursor-pointer transition-colors"
+                  className="flex items-center gap-1 hover:text-accent cursor-pointer transition-colors"
                   title="View selected assets"
                 >
                   <ImageIcon className="w-3 h-3 text-muted" />
@@ -222,7 +222,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                   >
                     <Users className="w-3 h-3 text-muted" />
                     <span>Host:</span>
-                    <span className="text-foreground font-bold underline decoration-dotted decoration-emerald-500/60 underline-offset-2">
+                    <span className="text-foreground font-bold underline decoration-dotted decoration-accent/60 underline-offset-2">
                       {hostPersonas.map((p) => p.name).join(", ")}
                     </span>
 
@@ -240,12 +240,12 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                               alt={persona.name}
                               loading="lazy"
                               onError={(e) => handleAvatarImgError(e, persona.avatarUrl || "/avatars/ruby.png")}
-                              className="w-12 h-12 rounded-xl border border-emerald-500/30 object-cover bg-surface-overlay shrink-0 shadow"
+                              className="w-12 h-12 rounded-xl border border-accent/30 object-cover bg-surface-overlay shrink-0 shadow"
                             />
                             <div className="min-w-0 text-left flex-1">
                               <h4 className="text-xs font-black text-foreground leading-none mb-1 flex items-center justify-between">
                                 <span>{persona.name}</span>
-                                <span className="text-[8px] bg-emerald-500/15 px-1 py-0.2 rounded text-emerald-400 font-mono font-bold uppercase">
+                                <span className="text-[8px] bg-accent/15 px-1 py-0.2 rounded text-accent font-mono font-bold uppercase">
                                   {persona.language}
                                 </span>
                               </h4>
@@ -331,9 +331,9 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                 <Button
                   size="sm"
                   variant="glass"
-                  className="text-[10px] py-1 px-2.5 h-7 min-h-0 font-bold flex items-center gap-1 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                  className="text-[10px] py-1 px-2.5 h-7 min-h-0 font-bold flex items-center gap-1 text-accent border-accent/30 hover:bg-accent/10"
                 >
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  <Sparkles className="w-3 h-3 text-accent" />
                   <span>Studios</span>
                   <ChevronDown className="w-3 h-3" />
                 </Button>
@@ -369,7 +369,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
                   variant="secondary"
                   className="text-[10px] py-1 px-2.5 h-7 min-h-0 font-bold"
                 >
-                  <Link href={`/editor/${story.id}`} prefetch={false} className="inline-flex items-center gap-1.5 text-foreground hover:text-emerald-300">
+                  <Link href={`/editor/${story.id}`} prefetch={false} className="inline-flex items-center gap-1.5 text-foreground hover:text-accent-hover">
                     <Edit3 className="w-3 h-3 text-muted" />
                     <span>Editor</span>
                   </Link>
@@ -382,7 +382,7 @@ const StoryCardComponent: React.FC<StoryCardProps> = ({
             href={story.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[10px] font-mono text-muted hover:text-emerald-400 font-semibold transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1 text-[10px] font-mono text-muted hover:text-accent font-semibold transition-colors whitespace-nowrap"
           >
             <span>Original</span>
             <ExternalLink className="w-3 h-3" />

@@ -2,7 +2,7 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PaletteSwitcher } from "../PaletteSwitcher";
+import { PaletteSelectorGrid, PaletteSwitcher } from "../PaletteSwitcher";
 import { PALETTES, PALETTE_ATTRIBUTE, PALETTE_STORAGE_KEY } from "@/lib/theme/palettes";
 import { setPalette } from "@/lib/theme/paletteStore";
 
@@ -86,5 +86,36 @@ describe("PaletteSwitcher", () => {
   it("re-renders when the palette changes elsewhere (e.g. another tab or switcher)", () => {
     act(() => setPalette("ember"));
     expect(trigger().textContent).toContain("Ember");
+  });
+
+  it("supports compact top-bar variant with downward popover", () => {
+    act(() => root.render(<PaletteSwitcher variant="compact" />));
+    expect(trigger().getAttribute("title")).toBe("Color palette: Obsidian");
+    expect(trigger().textContent).toContain("Color palette: Obsidian");
+    click(trigger());
+    const listId = trigger().getAttribute("aria-controls")!;
+    const popover = document.getElementById(listId)!;
+    expect(popover.className).toContain("top-full");
+    click(radioNamed("Midnight Newsroom"));
+    expect(active()).toBe("midnight");
+    expect(trigger().getAttribute("title")).toBe("Color palette: Midnight Newsroom");
+  });
+});
+
+describe("PaletteSelectorGrid", () => {
+  it("renders all 6 palettes as radios, updates DOM + localStorage, and supports keyboard cycling", () => {
+    act(() => root.render(<PaletteSelectorGrid />));
+    const group = container.querySelector('[role="radiogroup"]');
+    expect(group?.getAttribute("aria-label")).toBe("Color palette");
+    expect(radios()).toHaveLength(PALETTES.length);
+
+    click(radioNamed("High Contrast"));
+    expect(active()).toBe("contrast");
+    expect(localStorage.getItem(PALETTE_STORAGE_KEY)).toBe("contrast");
+    expect(radioNamed("High Contrast").getAttribute("aria-checked")).toBe("true");
+
+    key(radioNamed("High Contrast"), "ArrowRight");
+    expect(active()).toBe(PALETTES[0].id);
+    expect(document.activeElement).toBe(radios()[0]);
   });
 });

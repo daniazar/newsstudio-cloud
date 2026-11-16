@@ -11,9 +11,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles = {
   primary:
-    "bg-accent text-white font-bold hover:bg-accent-hover shadow-lg shadow-accent/20 active:scale-[0.98]",
+    "bg-accent text-accent-foreground font-bold hover:bg-accent-hover shadow-lg shadow-accent/20 active:scale-[0.98]",
   "emerald-glow":
-    "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold hover:from-emerald-400 hover:to-emerald-500 shadow-lg shadow-emerald-500/25 border border-emerald-400/30 active:scale-[0.98]",
+    "bg-gradient-to-r from-accent-hover to-accent text-accent-foreground font-bold hover:opacity-95 shadow-lg shadow-accent/25 border border-accent-hover/30 active:scale-[0.98]",
   "ruby-live":
     "bg-gradient-to-r from-rose-600 to-rose-700 text-white font-bold hover:from-rose-500 hover:to-rose-600 shadow-lg shadow-rose-600/30 border border-rose-400/30 active:scale-[0.98]",
   glass:

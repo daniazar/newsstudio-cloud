@@ -319,6 +319,7 @@ export const Sidebar = React.memo(function Sidebar() {
               appearance={orgSwitcherAppearance}
             />
           </ClerkLoaded>
+          <PaletteSwitcher variant="compact" />
           <NotificationDropdown disableToast />
           <UserButton
             signInUrl="/"

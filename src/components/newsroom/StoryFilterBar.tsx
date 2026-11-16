@@ -76,7 +76,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search news stories, headlines, or keywords..."
-            className="w-full bg-surface-raised/90 border border-border/80 rounded-xl pl-9 pr-14 py-2 text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-emerald-500/60 transition-colors"
+            className="w-full bg-surface-raised/90 border border-border/80 rounded-xl pl-9 pr-14 py-2 text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/60 transition-colors"
           />
           <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {searchQuery ? (
@@ -101,7 +101,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
             <select
               value={selectedBrand}
               onChange={(e) => onBrandChange(e.target.value)}
-              className="bg-surface-raised/90 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/60 cursor-pointer font-medium"
+              className="bg-surface-raised/90 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent/60 cursor-pointer font-medium"
             >
               <option value="all">All Brands</option>
               {brands.map((b) => (
@@ -116,7 +116,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
           <select
             value={selectedStatus}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="bg-surface-raised/90 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/60 cursor-pointer font-medium"
+            className="bg-surface-raised/90 border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent/60 cursor-pointer font-medium"
           >
             <option value="all">All Pipeline Stages</option>
             <option value="INGESTED">Ingested</option>
@@ -147,7 +147,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
               onClick={() => onViewModeChange("grid")}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "grid"
-                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 font-bold"
+                  ? "bg-accent text-accent-foreground shadow-sm shadow-accent/20 font-bold"
                   : "text-muted hover:text-foreground"
               }`}
               title="Bento Grid View"
@@ -158,7 +158,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
               onClick={() => onViewModeChange("kanban")}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "kanban"
-                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 font-bold"
+                  ? "bg-accent text-accent-foreground shadow-sm shadow-accent/20 font-bold"
                   : "text-muted hover:text-foreground"
               }`}
               title="Kanban Board View"
@@ -169,7 +169,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
               onClick={() => onViewModeChange("table")}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "table"
-                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 font-bold"
+                  ? "bg-accent text-accent-foreground shadow-sm shadow-accent/20 font-bold"
                   : "text-muted hover:text-foreground"
               }`}
               title="Table View"
@@ -190,7 +190,7 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
               onClick={() => onCategoryChange(cat)}
               className={`px-3 py-1 rounded-xl text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
                 selectedCategory.toLowerCase() === cat.toLowerCase()
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10"
+                  ? "bg-accent/20 text-accent-hover border border-accent/40 shadow-sm shadow-accent/10"
                   : "bg-white/[0.03] hover:bg-white/[0.06] border border-border/60 text-subtle hover:text-foreground"
               }`}
             >
@@ -202,8 +202,8 @@ export const StoryFilterBar: React.FC<StoryFilterBarProps> = ({
         {/* Approval Filter Pills / Batch Selection Indicator */}
         <div className="flex items-center gap-2">
           {selectedCount > 0 && (
-            <div className="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-xl shadow-sm shadow-emerald-500/10">
-              <span className="text-xs font-mono font-bold text-emerald-300">{selectedCount} Selected</span>
+            <div className="flex items-center gap-2 bg-accent/15 border border-accent/30 px-3 py-1 rounded-xl shadow-sm shadow-accent/10">
+              <span className="text-xs font-mono font-bold text-accent-hover">{selectedCount} Selected</span>
               {onBatchApprove && (
                 <button
                   onClick={onBatchApprove}

@@ -26,7 +26,15 @@ flowchart LR
 - **Palettes are attribute-scoped blocks:** `:root[data-palette="midnight"] { --color-accent: … }`. These blocks are unlayered, so they win over Tailwind's `@layer theme` defaults.
 - **Only base tokens are set per palette.** Derived tokens (`accent-muted`, `accent-subtle`, `surface-translucent`, `.glass-*`, `::selection`) are built with `color-mix()` in `globals.css` and follow the palette automatically.
 - **Hard-coded neutrals are remapped.** Much of the UI uses `zinc-*` / `slate-*` / `gray-*` / `neutral-*` directly. For every palette except Obsidian, those scales are rebuilt in OKLCH from the palette's `--neutral-hue` / `--neutral-chroma`, using Tailwind's zinc lightness steps. Older screens therefore pick up the palette tint without being rewritten.
-- **Status colors are fixed.** `success`, `warning`, `error`, `info`, `ruby` and `amber` (and the literal `emerald-*` / `rose-*` / `amber-*` classes) keep the same color in every palette, because they mean something (online, failed, on air).
+- **Semantic tokens** (below) vs **Status colors:** `success`, `warning`, `error`, `info`, `ruby` and `amber` (and the literal `emerald-*` / `rose-*` / `amber-*` classes) keep the same color in every palette, because they mean something (online, failed, on air).
+
+## Where users switch palettes
+
+All switchers share the same external store (`src/lib/theme/paletteStore.ts`) and persist to `localStorage`:
+
+1. **Sidebar footer (`PaletteSwitcher`):** `Theme: <label>` button above Cluster Engines on desktop viewports (`lg+`) and inside the mobile drawer.
+2. **Mobile / narrow top bar (`PaletteSwitcher variant="compact"`):** Palette icon + swatch button in the `< 1024px` header so the picker stays reachable on split-screen or mobile viewports.
+3. **Settings page (`/admin/settings`, `PaletteSelectorGrid`):** Full-width **Appearance & Color Palette** 6-card grid.
 
 ## Semantic tokens
 
