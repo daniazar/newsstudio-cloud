@@ -250,12 +250,26 @@ All workflows live in `comfy_workflows/video/`. The `workflowBuilder.ts` dynamic
 
 ---
 
+## Cloud Deployment & Custom Domain Cost Caveats
+
+Before assigning a custom domain to the live Railway deployment (`https://newsstudio.up.railway.app`), review [`docs/CLOUD_PRICING_AND_WORKER_HOSTING.md`](./docs/CLOUD_PRICING_AND_WORKER_HOSTING.md). In particular:
+
+1. **Serve R2 Directly via Custom Domain (Avoid Railway `\$0.05/GB` Egress)**: Currently, `next.config.ts` (`rewrites()`) and `src/remotion/utils/resolveSrc.ts` proxy `/r2/*`, `/assets/*`, and `/avatars/*` through Railway for same-origin loading on `*.up.railway.app`. Once you attach a domain, bind a CDN subdomain (e.g., `cdn.yourdomain.com`) directly to the R2 bucket in Cloudflare, allow `GET, HEAD, Range` CORS from your app origin (exposing `Content-Range, Accept-Ranges, Content-Length, ETag`), point `NEXT_PUBLIC_S3_PUBLIC_URL` at `https://cdn.yourdomain.com`, and remove the media proxy rewrites so video streaming incurs **\$0/GB egress**.
+2. **Cloudflare Cache Rules & SSL `Full (strict)`**: Enable a Cloudflare Cache Rule (`Cache Everything`) on `cdn.yourdomain.com` so repeat video/image loads don't consume R2's `10M/mo` free Class B reads. On `app.yourdomain.com`, use DNS-only or SSL/TLS **`Full (strict)`** (never `Flexible`) with cache bypass on `/api/*` and `/_next/data/*`.
+3. **Rebuild After Updating `NEXT_PUBLIC_*` & `MAIN_APP_URL`**: `Dockerfile` bakes `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_S3_PUBLIC_URL`, and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` during `npm run build`. Trigger a Railway rebuild after changing them, and update `MAIN_APP_URL` in worker `.env` files.
+4. **Update CSP Before Enabling Clerk `pk_live_`**: Production Clerk uses custom subdomains (`clerk.yourdomain.com`, `accounts.yourdomain.com`) rather than `*.clerk.accounts.dev`. Add them (plus `cdn.yourdomain.com`) to `Content-Security-Policy` and `images.remotePatterns` in `next.config.ts` before switching keys, and monitor Clerk B2B seat thresholds.
+5. **Do Not Point External Uptime Pingers at `/api/health`**: Frequent HTTP health probes prevent Railway `sleepApplication: true` from sleeping and waste compute credits.
+6. **Keep R2 Action Loops Selective & Enforce `temp/` Lifecycle**: Add a 7-day R2 Lifecycle expiration rule on `temp/` alongside selective action-loop uploads (`< 10 GB` free storage cap).
+
+---
+
 ## Documentation
 
 | Document | Purpose |
 |---|---|
 | [`AGENTS.md`](./AGENTS.md) | **Single source of truth** for AI coding agents & project architecture |
 | [`ROADMAP.md`](./ROADMAP.md) | Master Product Roadmap — sprint plan, completed features & backlog |
+| [`docs/CLOUD_PRICING_AND_WORKER_HOSTING.md`](./docs/CLOUD_PRICING_AND_WORKER_HOSTING.md) | Long-run R2/Railway/Supabase pricing, custom domain caveats & online NewsStudio/CineZero worker hosting |
 | [`docs/REALTIME_LIPSYNC_OPTIMIZATION_SERIES.md`](./docs/REALTIME_LIPSYNC_OPTIMIZATION_SERIES.md) | **MuseTalk Real-Time Lip-Sync Optimization Series** (351.6 FPS, TensorRT FP8/FP16, NVENC) |
 | [`docs/architecture.md`](./docs/architecture.md) | Pipeline data flow, microservice ports & health check architecture |
 | [`docs/MODERN_TTS_WALKTHROUGH.md`](./docs/MODERN_TTS_WALKTHROUGH.md) | Modern-TTS-Server engine hub setup & voice model guide |
