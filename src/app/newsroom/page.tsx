@@ -351,7 +351,7 @@ export default function DashboardPage() {
                           <Link
                             href={`/editor/${story.id}`}
                             prefetch={false}
-                            className="px-2.5 py-1 rounded-lg bg-accent text-white font-bold text-[11px] hover:bg-accent-hover transition-colors"
+                            className="px-2.5 py-1 rounded-lg bg-accent text-accent-foreground font-bold text-[11px] hover:bg-accent-hover transition-colors"
                           >
                             Editor →
                           </Link>

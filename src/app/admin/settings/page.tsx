@@ -7,13 +7,28 @@ import { useToast } from "@/components/global/ToastContainer";
 import { 
   Settings2, Bot, Server, Image as ImageIcon, 
   Zap, Save, RefreshCw, ShieldAlert, ArrowRight, Eye, EyeOff, Music, Clock,
-  Layers, Sparkles, Cpu
+  Layers, Sparkles, Cpu, Palette
 } from "lucide-react";
 import { ByokManager } from "@/components/admin/ByokManager";
 import { TokenSpendDashboard } from "@/components/admin/TokenSpendDashboard";
+import { PaletteSelectorGrid } from "@/components/global/PaletteSwitcher";
 import { useCachedSuperAdmin } from "@/lib/hooks/useSidebarIdentity";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+function AppearancePaletteCard() {
+  return (
+    <div className="backdrop-blur-md bg-surface/30 border border-border/80 rounded-3xl p-6 space-y-4 shadow">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-border/60 pb-3">
+        <h3 className="text-sm font-black text-foreground flex items-center gap-2">
+          <Palette className="w-4 h-4 text-accent" /> Appearance & Color Palette
+        </h3>
+        <span className="text-[10px] font-mono text-muted">Applies instantly in this browser</span>
+      </div>
+      <PaletteSelectorGrid />
+    </div>
+  );
+}
 
 interface LlmTierSettings {
   realtime: string;
@@ -96,17 +111,21 @@ export default function AdminSettingsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="p-6 md:p-8 max-w-xl mx-auto min-h-[60vh] flex flex-col justify-center items-center text-center space-y-6">
-        <div className="w-20 h-20 rounded-3xl bg-error/10 border border-error/30 flex items-center justify-center shadow-lg animate-bounce">
-          <ShieldAlert className="w-10 h-10 text-error" />
+      <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-8">
+        <AppearancePaletteCard />
+
+        <div className="max-w-xl mx-auto min-h-[40vh] flex flex-col justify-center items-center text-center space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-error/10 border border-error/30 flex items-center justify-center shadow-lg animate-bounce">
+            <ShieldAlert className="w-10 h-10 text-error" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-black text-foreground">Access Denied</h1>
+            <p className="text-xs text-muted font-semibold">Settings requires administrator privileges.</p>
+          </div>
+          <a href="/" className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/5 border border-border hover:bg-white/10 rounded-xl font-bold text-xs">
+            Return to Dashboard <ArrowRight className="w-4 h-4" />
+          </a>
         </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-black text-foreground">Access Denied</h1>
-          <p className="text-xs text-muted font-semibold">Settings requires administrator privileges.</p>
-        </div>
-        <a href="/" className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/5 border border-border hover:bg-white/10 rounded-xl font-bold text-xs">
-          Return to Dashboard <ArrowRight className="w-4 h-4" />
-        </a>
       </div>
     );
   }
@@ -160,12 +179,15 @@ export default function AdminSettingsPage() {
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-accent text-white font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-accent-hover transition-all active:scale-95 shadow-md shadow-accent/20 disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-2.5 bg-accent text-accent-foreground font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-accent-hover transition-all active:scale-95 shadow-md shadow-accent/20 disabled:opacity-50"
         >
           {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save Changes
         </button>
       </div>
+
+      {/* Appearance & Color Palette */}
+      <AppearancePaletteCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         

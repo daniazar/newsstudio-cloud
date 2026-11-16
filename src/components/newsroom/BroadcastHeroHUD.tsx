@@ -29,7 +29,7 @@ export const BroadcastHeroHUD: React.FC<BroadcastHeroHUDProps> = ({
   return (
     <div className="relative rounded-3xl overflow-hidden glass-panel-raised border border-white/10 p-6 sm:p-7 shadow-2xl mb-6">
       {/* Specular Ambient Glow Orbs */}
-      <div className="absolute top-0 right-1/4 w-80 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-1/4 w-80 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-80 h-32 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
@@ -44,7 +44,7 @@ export const BroadcastHeroHUD: React.FC<BroadcastHeroHUDProps> = ({
               <h1 className="text-xl font-black text-foreground tracking-tight">
                 Newsroom Command Center
               </h1>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-accent/10 text-accent border border-accent/30">
                 BROADCAST v2.5
               </span>
             </div>
@@ -78,7 +78,7 @@ export const BroadcastHeroHUD: React.FC<BroadcastHeroHUDProps> = ({
             </div>
             <Link
               href="/personas"
-              className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-emerald-400 hover:text-emerald-300 transition-colors ml-1"
+              className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-accent hover:text-accent-hover transition-colors ml-1"
             >
               <span>Vault</span>
               <ArrowUpRight className="w-3 h-3" />
@@ -122,7 +122,7 @@ export const BroadcastHeroHUD: React.FC<BroadcastHeroHUDProps> = ({
               className={`px-4 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
                 isIngesting
                   ? "bg-white/10 border-white/10 text-muted cursor-not-allowed"
-                  : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 border-emerald-400/30 text-white shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                  : "bg-gradient-to-r from-accent-hover to-accent hover:opacity-95 border-accent-hover/30 text-accent-foreground shadow-accent/20 hover:scale-[1.02] active:scale-[0.98]"
               }`}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isIngesting ? "animate-spin" : ""}`} />
