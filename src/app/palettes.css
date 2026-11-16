@@ -1,0 +1,219 @@
+/* ============================================================
+   Ruby NewsStudio — Color Palettes
+   ------------------------------------------------------------
+   Each palette is a block of CSS custom properties scoped to
+   `:root[data-palette="<id>"]`. Tailwind v4 utilities resolve to
+   `var(--color-*)`, so swapping the attribute on <html> re-themes
+   the whole app at runtime.
+
+   Registry (ids, labels, preview swatches): src/lib/theme/palettes.ts
+   Parity + WCAG contrast tests:          src/lib/theme/__tests__/palettes.test.ts
+
+   Conventions
+   - Only BASE tokens are declared per palette. Derived tokens
+     (accent-muted, accent-subtle, surface-translucent, ...) are
+     computed with color-mix() in globals.css and follow automatically.
+   - Status colors (success / warning / error / info, ruby, amber)
+     are intentionally NOT re-themed: they carry meaning
+     (on-air, failed, queued) and must stay recognizable.
+   - Semantic token values are hex so the contrast test can parse them.
+   ============================================================ */
+
+/* ---------- Obsidian (default) ----------
+   Mirrors the @theme defaults in globals.css exactly, so selecting it
+   is a zero-diff from the original design. It also keeps Tailwind's
+   stock zinc/slate/gray scales (no neutral remap below). */
+:root[data-palette="obsidian"] {
+  --color-background: #060709;
+  --color-surface: #0c0d12;
+  --color-surface-raised: #13161f;
+  --color-surface-overlay: #1a1e2b;
+  --color-foreground: #f8fafc;
+  --color-muted: #64748b;
+  --color-subtle: #94a3b8;
+  --color-muted-foreground: #94a3b8;
+  --color-border: #1e2433;
+  --color-border-hover: #333d54;
+  --color-accent: #10b981;
+  --color-accent-hover: #34d399;
+  --color-accent-foreground: #03130d;
+}
+
+/* ---------- Midnight Newsroom ---------- */
+:root[data-palette="midnight"] {
+  --color-background: #050a14;
+  --color-surface: #0a1120;
+  --color-surface-raised: #101a2e;
+  --color-surface-overlay: #16233b;
+  --color-foreground: #f1f6ff;
+  --color-muted: #6b7f9e;
+  --color-subtle: #9fb2cf;
+  --color-muted-foreground: #9fb2cf;
+  --color-border: #1a2740;
+  --color-border-hover: #2c3f61;
+  --color-accent: #3b9eff;
+  --color-accent-hover: #6cb6ff;
+  --color-accent-foreground: #02101f;
+
+  --neutral-hue: 255;
+  --neutral-chroma: 0.04;
+}
+
+/* ---------- Aurora ---------- */
+:root[data-palette="aurora"] {
+  --color-background: #08060f;
+  --color-surface: #0f0b1a;
+  --color-surface-raised: #171127;
+  --color-surface-overlay: #1f1834;
+  --color-foreground: #f7f4ff;
+  --color-muted: #7a6f96;
+  --color-subtle: #b0a6cc;
+  --color-muted-foreground: #b0a6cc;
+  --color-border: #241c3a;
+  --color-border-hover: #3a2f5a;
+  --color-accent: #a78bfa;
+  --color-accent-hover: #c4b5fd;
+  --color-accent-foreground: #160a33;
+
+  --neutral-hue: 295;
+  --neutral-chroma: 0.04;
+}
+
+/* ---------- Ember ---------- */
+:root[data-palette="ember"] {
+  --color-background: #0b0806;
+  --color-surface: #130e0b;
+  --color-surface-raised: #1c1511;
+  --color-surface-overlay: #261c16;
+  --color-foreground: #fdf8f3;
+  --color-muted: #8a7768;
+  --color-subtle: #c2b1a3;
+  --color-muted-foreground: #c2b1a3;
+  --color-border: #2b2019;
+  --color-border-hover: #45342a;
+  --color-accent: #fb923c;
+  --color-accent-hover: #fdba74;
+  --color-accent-foreground: #1f0d02;
+
+  --neutral-hue: 55;
+  --neutral-chroma: 0.025;
+}
+
+/* ---------- Graphite ---------- */
+:root[data-palette="graphite"] {
+  --color-background: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-raised: #181818;
+  --color-surface-overlay: #212121;
+  --color-foreground: #fafafa;
+  --color-muted: #737373;
+  --color-subtle: #a3a3a3;
+  --color-muted-foreground: #a3a3a3;
+  --color-border: #262626;
+  --color-border-hover: #3d3d3d;
+  --color-accent: #e5e5e5;
+  --color-accent-hover: #ffffff;
+  --color-accent-foreground: #0a0a0a;
+
+  --neutral-hue: 0;
+  --neutral-chroma: 0;
+}
+
+/* ---------- High Contrast ----------
+   Targets WCAG AAA for body text and 3:1 for UI boundaries. */
+:root[data-palette="contrast"] {
+  --color-background: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #141414;
+  --color-surface-overlay: #1f1f1f;
+  --color-foreground: #ffffff;
+  --color-muted: #c7c7c7;
+  --color-subtle: #e5e5e5;
+  --color-muted-foreground: #e5e5e5;
+  --color-border: #8a8a8a;
+  --color-border-hover: #d4d4d4;
+  --color-border-subtle: rgba(255, 255, 255, 0.35);
+  --color-accent: #ffd60a;
+  --color-accent-hover: #ffe45c;
+  --color-accent-foreground: #000000;
+
+  --neutral-hue: 0;
+  --neutral-chroma: 0;
+}
+
+/* ============================================================
+   Neutral scale remap
+   ------------------------------------------------------------
+   Much of the UI still uses Tailwind's stock neutrals directly
+   (zinc-*, slate-*, gray-*, neutral-*). Re-deriving those scales
+   from each palette's hue keeps hard-coded panels in harmony with
+   the palette instead of clashing with it.
+
+   Lightness steps match Tailwind v4's zinc scale; chroma follows
+   zinc's curve, scaled by --neutral-chroma (the peak, at 600).
+   Obsidian is excluded so the original design is untouched.
+   :where() keeps specificity at (0,1,0) so per-palette blocks
+   (e.g. High Contrast below) can override individual steps.
+   ============================================================ */
+:root:where([data-palette]:not([data-palette="obsidian"])) {
+  --color-zinc-50: oklch(98.5% 0 var(--neutral-hue));
+  --color-zinc-100: oklch(96.7% calc(var(--neutral-chroma) * 0.06) var(--neutral-hue));
+  --color-zinc-200: oklch(92% calc(var(--neutral-chroma) * 0.24) var(--neutral-hue));
+  --color-zinc-300: oklch(87.1% calc(var(--neutral-chroma) * 0.35) var(--neutral-hue));
+  --color-zinc-400: oklch(70.5% calc(var(--neutral-chroma) * 0.88) var(--neutral-hue));
+  --color-zinc-500: oklch(55.2% calc(var(--neutral-chroma) * 0.94) var(--neutral-hue));
+  --color-zinc-600: oklch(44.2% var(--neutral-chroma) var(--neutral-hue));
+  --color-zinc-700: oklch(37% calc(var(--neutral-chroma) * 0.76) var(--neutral-hue));
+  --color-zinc-800: oklch(27.4% calc(var(--neutral-chroma) * 0.35) var(--neutral-hue));
+  --color-zinc-900: oklch(21% calc(var(--neutral-chroma) * 0.35) var(--neutral-hue));
+  --color-zinc-950: oklch(14.1% calc(var(--neutral-chroma) * 0.3) var(--neutral-hue));
+
+  --color-slate-50: var(--color-zinc-50);
+  --color-slate-100: var(--color-zinc-100);
+  --color-slate-200: var(--color-zinc-200);
+  --color-slate-300: var(--color-zinc-300);
+  --color-slate-400: var(--color-zinc-400);
+  --color-slate-500: var(--color-zinc-500);
+  --color-slate-600: var(--color-zinc-600);
+  --color-slate-700: var(--color-zinc-700);
+  --color-slate-800: var(--color-zinc-800);
+  --color-slate-900: var(--color-zinc-900);
+  --color-slate-950: var(--color-zinc-950);
+
+  --color-gray-50: var(--color-zinc-50);
+  --color-gray-100: var(--color-zinc-100);
+  --color-gray-200: var(--color-zinc-200);
+  --color-gray-300: var(--color-zinc-300);
+  --color-gray-400: var(--color-zinc-400);
+  --color-gray-500: var(--color-zinc-500);
+  --color-gray-600: var(--color-zinc-600);
+  --color-gray-700: var(--color-zinc-700);
+  --color-gray-800: var(--color-zinc-800);
+  --color-gray-900: var(--color-zinc-900);
+  --color-gray-950: var(--color-zinc-950);
+
+  --color-neutral-50: var(--color-zinc-50);
+  --color-neutral-100: var(--color-zinc-100);
+  --color-neutral-200: var(--color-zinc-200);
+  --color-neutral-300: var(--color-zinc-300);
+  --color-neutral-400: var(--color-zinc-400);
+  --color-neutral-500: var(--color-zinc-500);
+  --color-neutral-600: var(--color-zinc-600);
+  --color-neutral-700: var(--color-zinc-700);
+  --color-neutral-800: var(--color-zinc-800);
+  --color-neutral-900: var(--color-zinc-900);
+  --color-neutral-950: var(--color-zinc-950);
+}
+
+/* High Contrast: lift the mid-grey text steps (zinc-400..600 are the
+   usual "secondary text" shades) so they clear 7:1 on black. */
+:root[data-palette="contrast"] {
+  --color-zinc-400: oklch(88% 0 0);
+  --color-zinc-500: oklch(82% 0 0);
+  --color-zinc-600: oklch(74% 0 0);
+  --color-zinc-700: oklch(52% 0 0);
+}
+
+:root[data-palette="contrast"] *:focus-visible {
+  outline-width: 3px;
+}

@@ -1,9 +1,21 @@
 @import "tailwindcss";
+/* Runtime-switchable palettes (data-palette on <html>). See src/lib/theme/palettes.ts */
+@import "./palettes.css";
 
 /* ============================================================
    Ruby NewsStudio — Broadcast Luminescence & Obsidian Theme
    Cinematic AI Creative Suite & Command Center Design System
+
+   The values below are the Obsidian defaults, used when no
+   data-palette attribute is present. Palettes override the BASE
+   tokens; DERIVED tokens (color-mix) follow automatically.
    ============================================================ */
+
+:root {
+  /* Every palette is dark: native controls, scrollbars and form
+     widgets should render in their dark variants. */
+  color-scheme: dark;
+}
 
 @theme {
   /* Obsidian Depth Colors */
@@ -11,23 +23,28 @@
   --color-surface: #0c0d12;
   --color-surface-raised: #13161f;
   --color-surface-overlay: #1a1e2b;
-  --color-surface-translucent: rgba(12, 13, 18, 0.75);
+  --color-surface-translucent: color-mix(in oklab, var(--color-surface) 75%, transparent);
+  --color-card: var(--color-surface);
 
   /* Text & Typography */
   --color-foreground: #f8fafc;
   --color-muted: #64748b;
   --color-subtle: #94a3b8;
+  /* Referenced by ~200 call sites; previously undefined, so the class was a no-op. */
+  --color-muted-foreground: #94a3b8;
 
   /* Specular & Subtle Borders */
   --color-border: #1e2433;
   --color-border-hover: #333d54;
   --color-border-subtle: rgba(255, 255, 255, 0.07);
 
-  /* Primary Emerald Glow (Active / Verified Engine) */
+  /* Primary Accent (Active / Verified Engine) — emerald in Obsidian */
   --color-accent: #10b981;
   --color-accent-hover: #34d399;
-  --color-accent-muted: rgba(16, 185, 129, 0.15);
-  --color-accent-subtle: rgba(16, 185, 129, 0.08);
+  --color-accent-foreground: #03130d;
+  --color-accent-muted: color-mix(in oklab, var(--color-accent) 15%, transparent);
+  --color-accent-subtle: color-mix(in oklab, var(--color-accent) 8%, transparent);
+  --color-destructive: #f43f5e;
 
   /* Broadcast Ruby Red (On-Air / Live CVI / Breaking) */
   --color-ruby: #f43f5e;
@@ -51,14 +68,14 @@
 
 /* Glassmorphism & Specular Border Utilities */
 .glass-panel {
-  background: rgba(12, 13, 18, 0.72);
+  background: color-mix(in oklab, var(--color-surface) 72%, transparent);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .glass-panel-raised {
-  background: rgba(19, 22, 31, 0.78);
+  background: color-mix(in oklab, var(--color-surface-raised) 78%, transparent);
   backdrop-filter: blur(20px) saturate(190%);
   -webkit-backdrop-filter: blur(20px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -66,7 +83,7 @@
 }
 
 .glass-floating {
-  background: rgba(26, 30, 43, 0.85);
+  background: color-mix(in oklab, var(--color-surface-overlay) 85%, transparent);
   backdrop-filter: blur(24px) saturate(200%);
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -116,7 +133,7 @@
 
 /* Selection */
 ::selection {
-  background: rgba(16, 185, 129, 0.25);
+  background: color-mix(in oklab, var(--color-accent) 25%, transparent);
   color: #ffffff;
 }
 
