@@ -69,7 +69,7 @@ function CachedOrgPreview({
           className="w-5 h-5 rounded-lg object-cover shrink-0 ring-1 ring-white/10"
         />
       ) : (
-        <span className="w-5 h-5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 shrink-0" />
+        <span className="w-5 h-5 rounded-lg bg-accent/20 border border-accent/30 shrink-0" />
       )}
       <span className="text-xs font-bold truncate">{org.name}</span>
     </div>
@@ -104,7 +104,8 @@ interface NavItem {
   // ElementType's props intersect to `never`.
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
-  badgeVariant?: "emerald" | "ruby" | "amber" | "sky";
+  /** "accent" follows the active palette; the others are fixed status colors. */
+  badgeVariant?: "accent" | "emerald" | "ruby" | "amber" | "sky";
 }
 
 interface NavGroup {
@@ -193,7 +194,7 @@ export const Sidebar = React.memo(function Sidebar() {
             label: "Voice Studio & Matrix",
             icon: Sliders,
             badge: "LIVE",
-            badgeVariant: "emerald",
+            badgeVariant: "accent",
           },
           { href: "/brands", label: "Brands & Channels", icon: Tv },
         ],
@@ -206,7 +207,7 @@ export const Sidebar = React.memo(function Sidebar() {
             label: "E-Commerce Studio",
             icon: ShoppingBag,
             badge: "NEW",
-            badgeVariant: "emerald",
+            badgeVariant: "accent",
           },
           { href: "/feeds", label: "RSS Feeds", icon: Rss },
           { href: "/vault/assets", label: "Asset Vault", icon: FolderOpen },
@@ -270,7 +271,10 @@ export const Sidebar = React.memo(function Sidebar() {
     if (variant === "sky") {
       return "bg-sky-500/20 text-sky-300 border-sky-500/30";
     }
-    return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    if (variant === "emerald") {
+      return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    }
+    return "bg-accent/20 text-accent-hover border-accent/30";
   };
 
   return (
@@ -282,8 +286,8 @@ export const Sidebar = React.memo(function Sidebar() {
           prefetch={false}
           className="flex items-center gap-2.5"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/30">
-            <span className="text-white font-black text-sm tracking-tighter">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-hover via-accent to-accent flex items-center justify-center shadow-lg shadow-accent/20 border border-accent-hover/30">
+            <span className="text-accent-foreground font-black text-sm tracking-tighter">
               R
             </span>
           </div>
@@ -317,7 +321,7 @@ export const Sidebar = React.memo(function Sidebar() {
             onClick={() => setIsMobileOpen(!isMobileOpen)}
             aria-label={isMobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMobileOpen}
-            className="p-2 rounded-xl bg-white/[0.04] border border-border hover:bg-white/10 text-subtle hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/[0.04] border border-border hover:bg-white/10 text-subtle hover:text-foreground transition-colors cursor-pointer"
           >
             {isMobileOpen ? (
               <X className="w-5 h-5" />
@@ -341,17 +345,17 @@ export const Sidebar = React.memo(function Sidebar() {
             prefetch={false}
             className="flex items-center gap-3 group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/30 group-hover:scale-105 transition-transform">
-              <span className="text-white font-black text-base tracking-tighter">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-hover via-accent to-accent flex items-center justify-center shadow-lg shadow-accent/20 border border-accent-hover/30 group-hover:scale-105 transition-transform">
+              <span className="text-accent-foreground font-black text-base tracking-tighter">
                 R
               </span>
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-black text-foreground tracking-tight group-hover:text-emerald-400 transition-colors">
+                <h1 className="text-sm font-black text-foreground tracking-tight group-hover:text-accent transition-colors">
                   RubyStudio
                 </h1>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-accent/10 text-accent border border-accent/20">
                   AI
                 </span>
               </div>
@@ -363,7 +367,7 @@ export const Sidebar = React.memo(function Sidebar() {
           <div className="hidden lg:flex items-center gap-2">
             <button
               onClick={() => setNotifOpen(!isNotifOpen)}
-              className="relative p-2 rounded-xl bg-white/[0.04] border border-border hover:border-border-hover hover:bg-white/[0.08] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center text-subtle hover:text-white"
+              className="relative p-2 rounded-xl bg-white/[0.04] border border-border hover:border-border-hover hover:bg-white/[0.08] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center text-subtle hover:text-foreground"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
@@ -431,7 +435,7 @@ export const Sidebar = React.memo(function Sidebar() {
                       onClick={() => setIsMobileOpen(false)}
                       className={`group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold tracking-tight transition-all duration-150 cursor-pointer ${
                         isActive
-                          ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-sm shadow-emerald-500/10"
+                          ? "bg-accent/15 text-accent-hover font-bold border border-accent/30 shadow-sm shadow-accent/10"
                           : "text-subtle hover:text-foreground hover:bg-white/[0.04] border border-transparent"
                       }`}
                     >
@@ -439,7 +443,7 @@ export const Sidebar = React.memo(function Sidebar() {
                         <Icon
                           className={`w-4 h-4 transition-colors ${
                             isActive
-                              ? "text-emerald-400"
+                              ? "text-accent"
                               : "text-muted group-hover:text-foreground"
                           }`}
                         />
@@ -578,7 +582,7 @@ export const Sidebar = React.memo(function Sidebar() {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-6 h-3.5 bg-white/10 rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-2.5 after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all" />
+                <div className="w-6 h-3.5 bg-white/10 rounded-full peer peer-checked:bg-accent peer-checked:after:bg-accent-foreground peer-checked:after:translate-x-2.5 after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all" />
               </label>
             </div>
           </div>
